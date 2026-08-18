@@ -1,0 +1,88 @@
+services:
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mailautomation
+      POSTGRES_USER: mailuser
+      POSTGRES_PASSWORD: mailpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailuser -d mailautomation"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    env_file: .env
+    volumes:
+      - ./backend:/app
+      - ./media:/app/media
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: celery -A config worker -l INFO --concurrency=4
+    env_file: .env
+    volumes:
+      - ./backend:/app
+      - ./media:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      - backend
+      - redis
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: celery -A config beat -l INFO
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:

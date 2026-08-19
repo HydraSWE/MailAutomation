@@ -1,4 +1,6 @@
 import logging
+from typing import Any, cast
+
 from celery import chord, shared_task
 from django.db import transaction
 from django.utils import timezone
@@ -13,15 +15,16 @@ logger = logging.getLogger("campaigns.tasks")
 
 @shared_task()
 def dispatch_scheduled_campaigns():
-    for campaign in get_due_campaigns().select_related("organization").iterator():
+    for campaign in cast(Any, get_due_campaigns().select_related("organization").iterator()):
+        campaign = cast(Any, campaign)
         if campaign.status == Campaign.Status.SCHEDULED:
-            launch_campaign.delay(campaign.id)
+            cast(Any, launch_campaign).delay(campaign.id)
 
 
 @shared_task(bind=True)
 def launch_campaign(self, campaign_id):
     with transaction.atomic():
-        campaign = Campaign.objects.select_for_update(of=("self",)).select_related("organization", "recipient_list", "smtp").get(pk=campaign_id)
+        campaign = cast(Any, Campaign.objects.select_for_update(of=("self",)).select_related("organization", "recipient_list", "smtp").get(pk=campaign_id))
         if campaign.status in {Campaign.Status.CANCELLED, Campaign.Status.COMPLETED, Campaign.Status.RUNNING}:
             return {"detail": f"Campaign is already {campaign.status}."}
         count = campaign.recipient_list.recipients.filter(status="active", organization=campaign.organization).count() if campaign.recipient_list else 0
@@ -47,19 +50,19 @@ def launch_campaign(self, campaign_id):
         campaign.started_at = timezone.now()
         campaign.save(update_fields=["status", "started_at"])
 
-    log_ids = list(CampaignLog.objects.filter(campaign_id=campaign_id, status=CampaignLog.Status.PENDING).values_list("id", flat=True))
+    log_ids = list(cast(Any, CampaignLog.objects.filter(campaign_id=campaign_id, status=CampaignLog.Status.PENDING).values_list("id", flat=True)))
     if not log_ids:
-        finalize_campaign.delay([], campaign_id)
+        cast(Any, finalize_campaign).delay([], campaign_id)
         return {"queued": 0}
-    header = [send_campaign_email.s(log_id) for log_id in log_ids]
-    chord(header)(finalize_campaign.s(campaign_id))
+    header = [cast(Any, send_campaign_email).s(log_id) for log_id in log_ids]
+    chord(header)(cast(Any, finalize_campaign).s(campaign_id))
     return {"queued": len(log_ids)}
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_campaign_email(self, log_id):
     try:
-        log = CampaignLog.objects.select_related("campaign", "organization").get(pk=log_id)
+        log = cast(Any, CampaignLog.objects.select_related("campaign", "organization").get(pk=log_id))
     except CampaignLog.DoesNotExist:
         return {"log_id": log_id, "status": "NOT_FOUND"}
     if log.status in {CampaignLog.Status.SENT, CampaignLog.Status.SKIPPED} or log.campaign.status in {
@@ -72,25 +75,26 @@ def send_campaign_email(self, log_id):
     from email_engine.sender import send_log_email
     try:
         return send_log_email(log_id)
-    except Exception as exc:
+    except Exception:
+        safe_error = "Email delivery failed."
         if self.request.retries < self.max_retries:
-            CampaignLog.objects.filter(pk=log_id).update(status=CampaignLog.Status.PENDING, message=str(exc))
-            raise self.retry(exc=exc)
+            CampaignLog.objects.filter(pk=log_id).update(status=CampaignLog.Status.PENDING, message=safe_error)
+            raise self.retry(exc=RuntimeError(safe_error)) from None
         updated = CampaignLog.objects.filter(pk=log_id).exclude(status=CampaignLog.Status.FAILED).update(
-            status=CampaignLog.Status.FAILED, message=str(exc), attempts=self.request.retries + 1
+            status=CampaignLog.Status.FAILED, message=safe_error, attempts=self.request.retries + 1
         )
         if updated:
             record_email_result(log.organization_id, sent=False)
-        return {"log_id": log_id, "status": CampaignLog.Status.FAILED, "error": str(exc)}
+        return {"log_id": log_id, "status": CampaignLog.Status.FAILED, "error": safe_error}
 
 
 @shared_task()
 def finalize_campaign(results, campaign_id):
-    campaign = Campaign.objects.get(pk=campaign_id)
+    campaign = cast(Any, Campaign.objects.get(pk=campaign_id))
     if campaign.status in {Campaign.Status.CANCELLED, Campaign.Status.PAUSED}:
         return {"campaign_id": campaign_id, "status": campaign.status}
-    sent = campaign.logs.filter(status=CampaignLog.Status.SENT).count()
-    failed = campaign.logs.filter(status=CampaignLog.Status.FAILED).count()
+    sent = cast(Any, campaign.logs).filter(status=CampaignLog.Status.SENT).count()
+    failed = cast(Any, campaign.logs).filter(status=CampaignLog.Status.FAILED).count()
     campaign.sent_count, campaign.failed_count, campaign.finished_at = sent, failed, timezone.now()
     campaign.status = Campaign.Status.COMPLETED if sent > 0 and failed == 0 else Campaign.Status.FAILED
     campaign.save(update_fields=["sent_count", "failed_count", "finished_at", "status"])

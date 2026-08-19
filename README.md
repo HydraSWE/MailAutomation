@@ -5,7 +5,8 @@ A modular bulk-email campaign platform built with Django REST Framework, Postgre
 ## Included
 
 - Organization tenancy with owner/admin/manager/operator/viewer roles
-- Manual subscription limits for users, SMTP accounts, recipients, campaigns, and email quotas
+- Four subscription plans with separate administrator/user seats, SMTP limits, and anchored daily/weekly/30-day quotas
+- Direct USDT invoices and on-chain verification for BSC, Ethereum, Tron, and TON
 - Session-backed JWT authentication with a single active owner session
 - Email templates with HTML and JSON layouts
 - Recipient lists, CSV/XLSX import, search, filtering, and export
@@ -38,6 +39,8 @@ docker compose exec backend python manage.py createsuperuser
 - API: `http://localhost:8000/api/`
 - Admin: `http://localhost:8000/admin/`
 - Frontend: `http://localhost:5173/`
+- Landing/pricing: `http://localhost:5173/`
+- Login: `http://localhost:5173/login`
 
 ## Local backend setup
 
@@ -83,6 +86,18 @@ celery -A config beat -l INFO
 - `GET /api/campaigns/{id}/progress/`
 - `GET /api/campaign-logs/`
 - `GET /api/reports/campaign/{campaign_id}/`
+- `GET /api/billing/plans/`
+- `POST /api/billing/signup/free/`
+- `POST /api/billing/invoices/`
+- `GET /api/billing/invoices/{invoice_id}/`
+- `POST /api/billing/invoices/{invoice_id}/verify/`
+- `POST /api/billing/account/invoices/` (organization admin renewal/change)
+
+## Direct USDT subscriptions
+
+The customer chooses BSC, Ethereum, Tron, or TON and receives a short-lived invoice with a unique six-decimal USDT amount. After sending, they submit the transaction hash or explorer link. The backend verifies the allow-listed USDT contract, receiving wallet, amount, invoice time, confirmation/finality state, and one-time transaction use before provisioning the organization.
+
+Only public receiving addresses are configured. The application never needs a wallet seed phrase or private key. Set the wallet, token-contract, RPC/API, confirmation, quote-duration, and `USDT_BDT_RATE` values documented in `.env.example` before launch. The BDT-to-USDT conversion rate is an explicit business setting; review it regularly.
 
 ## Production deployment
 

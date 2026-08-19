@@ -116,7 +116,7 @@ const RAW_HTML_PRESETS = {
       <div style="text-align:center; margin:32px 0;">
         <a href="https://annomous.com" style="background:#4f46e5; color:#ffffff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600; display:inline-block;">Explore Now</a>
       </div>
-      <p style="font-size:14px; color:#64748b; margin-bottom:0;">Best regards,<br>The MailAutomation Team</p>
+              <p style="font-size:14px; color:#64748b; margin-bottom:0;">Best regards,<br>The Mail Flow Team</p>
     </div>
   </div>
 </body>

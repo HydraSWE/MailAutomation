@@ -16,8 +16,8 @@ export default function SMTPTestModal({
 
   // Send Test Email inputs
   const [recipientEmail, setRecipientEmail] = useState("");
-  const [testSubject, setTestSubject] = useState("Mail Automation SMTP Connection Test");
-  const [testMessage, setTestMessage] = useState("This is a test email sent from Mail Automation platform.");
+  const [testSubject, setTestSubject] = useState("Mail Flow SMTP Connection Test");
+  const [testMessage, setTestMessage] = useState("This is a test email sent from Mail Flow.");
 
   const handleRunConnectionTest = async () => {
     if (!server?.id) return;

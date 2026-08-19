@@ -30,7 +30,7 @@ def _connection(account):
 
 def send_log_email(log_id):
     with transaction.atomic():
-        log = CampaignLog.objects.select_for_update().select_related("campaign__template", "campaign__smtp", "recipient", "organization").get(pk=log_id)
+        log = CampaignLog.objects.select_for_update(of=("self",)).select_related("campaign__template", "campaign__smtp", "recipient", "organization").get(pk=log_id)
         if log.status == CampaignLog.Status.SENT:
             return {"log_id": log_id, "status": CampaignLog.Status.SENT, "detail": "already sent"}
         
@@ -52,8 +52,10 @@ def send_log_email(log_id):
         reservations = CampaignLog.objects.filter(
             organization=organization, status=CampaignLog.Status.PROCESSING
         ).exclude(pk=log.pk).count()
-        if usage["daily_remaining"] <= reservations:
+        if usage["daily_remaining"] is not None and usage["daily_remaining"] <= reservations:
             raise RuntimeError("Daily email quota exceeded.")
+        if usage["weekly_remaining"] is not None and usage["weekly_remaining"] <= reservations:
+            raise RuntimeError("Weekly email quota exceeded.")
         if usage["monthly_remaining"] <= reservations:
             raise RuntimeError("Monthly email quota exceeded.")
         if not log.campaign.smtp_id:

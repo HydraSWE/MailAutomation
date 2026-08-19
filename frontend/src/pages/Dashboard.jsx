@@ -45,9 +45,10 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards Grid */}
-      {data.quota && <div className="grid sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">Daily quota: {data.quota.daily_sent} used, {data.quota.daily_remaining} remaining</div>
-        <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">Monthly quota: {data.quota.monthly_sent} used, {data.quota.monthly_remaining} remaining</div>
+      {data.quota && <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">Daily quota: {data.quota.daily_sent} used, {data.quota.daily_remaining === null ? "unlimited" : `${data.quota.daily_remaining} remaining`}</div>
+        <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">Weekly quota: {data.quota.weekly_sent || 0} used, {data.quota.weekly_remaining === null ? "unlimited" : `${data.quota.weekly_remaining} remaining`}</div>
+        <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">30-day quota: {data.quota.monthly_sent} used, {data.quota.monthly_remaining} remaining</div>
         <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-sm text-indigo-200">Campaigns today: {data.quota.campaigns_today} used, {data.quota.campaigns_remaining} remaining</div>
       </div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

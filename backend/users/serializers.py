@@ -14,6 +14,15 @@ from .models import UserLoginSession
 User = get_user_model()
 
 
+def _seat_count(organization, role, exclude_user=None):
+    users = organization.users.all()
+    if exclude_user:
+        users = users.exclude(pk=exclude_user.pk)
+    if role == User.Role.ADMIN:
+        return users.filter(role=User.Role.ADMIN).count(), organization.max_admins, "Administrator"
+    return users.exclude(role__in=(User.Role.OWNER, User.Role.ADMIN)).count(), organization.max_users, "User"
+
+
 def _request_ip(request):
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "") if request else ""
     return forwarded.split(",")[0].strip() if forwarded else (request.META.get("REMOTE_ADDR") if request else None)
@@ -79,16 +88,16 @@ class UserSerializer(serializers.ModelSerializer):
         if actor and actor.role != User.Role.OWNER:
             if role == User.Role.OWNER:
                 raise serializers.ValidationError({"role": "Only the owner can assign this role."})
-            if role == User.Role.ADMIN and (self.instance is None or self.instance.role != User.Role.ADMIN):
-                raise serializers.ValidationError({"role": "Only the owner can create organization admins."})
             if organization and organization != actor.organization:
                 raise serializers.ValidationError({"organization": "Users must belong to your organization."})
             attrs["organization"] = actor.organization
             organization = actor.organization
         if actor and actor.role == User.Role.OWNER and role != User.Role.OWNER and not organization:
             raise serializers.ValidationError({"organization": "Customer users require an organization."})
-        if self.instance is None and organization and organization.users.count() >= organization.max_users:
-            raise serializers.ValidationError({"detail": "User limit reached for this account."})
+        if organization and role != User.Role.OWNER and (self.instance is None or role != self.instance.role):
+            count, limit, label = _seat_count(organization, role, self.instance)
+            if count >= limit:
+                raise serializers.ValidationError({"detail": f"{label} limit reached for this account."})
         if attrs.get("password"):
             validate_password(attrs["password"])
         return attrs
@@ -106,8 +115,9 @@ class UserSerializer(serializers.ModelSerializer):
         organization = validated_data.get("organization")
         if organization:
             organization = Organization.objects.select_for_update().get(pk=organization.pk)
-            if organization.users.count() >= organization.max_users:
-                raise serializers.ValidationError({"detail": "User limit reached for this account."})
+            count, limit, label = _seat_count(organization, validated_data.get("role", User.Role.OPERATOR))
+            if count >= limit:
+                raise serializers.ValidationError({"detail": f"{label} limit reached for this account."})
             validated_data["organization"] = organization
         user = User(**validated_data)
         user.is_staff = user.role == User.Role.OWNER

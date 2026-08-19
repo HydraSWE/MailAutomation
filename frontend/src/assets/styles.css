@@ -295,6 +295,7 @@ body {
 }
 
 /* Universal Element Controls Reset & Styling */
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -657,4 +658,3 @@ tr:hover {
   font-weight: 600;
   color: #cbd5e1;
 }
-

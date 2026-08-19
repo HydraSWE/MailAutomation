@@ -36,7 +36,7 @@ def test_smtp(account, timeout=15):
             except Exception:
                 pass
 
-def send_test_mail(account, recipient_email, subject="Test Email from Mail Automation System"):
+def send_test_mail(account, recipient_email, subject="Test Email from Mail Flow"):
     context = ssl.create_default_context()
 
     host = getattr(account, "host", None) or account.get("host")
@@ -45,7 +45,7 @@ def send_test_mail(account, recipient_email, subject="Test Email from Mail Autom
     password = account.get_password() if hasattr(account, "get_password") else account.get("password", "")
     encryption = (getattr(account, "encryption", None) or account.get("encryption") or "tls").lower()
     from_email = getattr(account, "from_email", None) or account.get("from_email") or username
-    from_name = getattr(account, "from_name", None) or account.get("from_name") or "Mail Automation System"
+    from_name = getattr(account, "from_name", None) or account.get("from_name") or "Mail Flow"
     reply_to = getattr(account, "reply_to", None) or account.get("reply_to") or ""
 
     msg = MIMEMultipart("alternative")
@@ -59,7 +59,7 @@ def send_test_mail(account, recipient_email, subject="Test Email from Mail Autom
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
         <h2 style="color: #4f46e5;">SMTP Connection Successful!</h2>
         <p>This test email confirms that your SMTP Server (<b>{host}:{port}</b>) is correctly configured.</p>
-        <p style="font-size: 12px; color: #777;">Sent via Mail Automation System</p>
+        <p style="font-size: 12px; color: #777;">Sent via Mail Flow</p>
     </div>
     """
     msg.attach(MIMEText(html_content, "html"))

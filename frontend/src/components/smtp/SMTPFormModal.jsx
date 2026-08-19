@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FormModal from "../common/FormModal";
+import CustomSelect from "../common/CustomSelect";
 import smtpApi from "../../services/smtpApi";
 import { useToast } from "../../hooks/useToast";
 
@@ -177,26 +178,28 @@ export default function SMTPFormModal({
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Encryption</label>
-            <select
+            <CustomSelect
               value={formData.encryption}
-              onChange={(e) => handleEncryptionChange(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 cursor-pointer"
-            >
-              <option value="tls">STARTTLS (Port 587)</option>
-              <option value="ssl">SSL / TLS (Port 465)</option>
-              <option value="none">None (Port 25)</option>
-            </select>
+              onChange={handleEncryptionChange}
+              options={[
+                { value: "tls", label: "STARTTLS (Port 587)" },
+                { value: "ssl", label: "SSL / TLS (Port 465)" },
+                { value: "none", label: "None (Port 25)" },
+              ]}
+              ariaLabel="SMTP encryption"
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
-            <select
+            <CustomSelect
               value={formData.status ? "true" : "false"}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value === "true" })}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 cursor-pointer"
-            >
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
+              onChange={(status) => setFormData({ ...formData, status: status === "true" })}
+              options={[
+                { value: "true", label: "Active" },
+                { value: "false", label: "Inactive" },
+              ]}
+              ariaLabel="SMTP status"
+            />
           </div>
         </div>
 

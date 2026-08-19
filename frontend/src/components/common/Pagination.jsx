@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import CustomSelect from "./CustomSelect";
 
 export default function Pagination({
   page,
@@ -24,17 +25,14 @@ export default function Pagination({
         {onPageSizeChange && (
           <div className="flex items-center gap-1.5 ml-2">
             <span>Per page:</span>
-            <select
+            <CustomSelect
               value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+              onChange={(nextPageSize) => onPageSizeChange(Number(nextPageSize))}
+              options={pageSizeOptions.map((option) => ({ value: option, label: String(option) }))}
+              ariaLabel="Items per page"
+              size="sm"
+              className="w-20"
+            />
           </div>
         )}
       </div>

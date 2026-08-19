@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -24,7 +24,15 @@ import CampaignReportPage from "./pages/reports/CampaignReportPage";
 // Settings Page
 import SettingsPage from "./pages/settings/SettingsPage";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import PlatformOverview from "./pages/platform/PlatformOverview";
+import PlatformOrganizations from "./pages/platform/PlatformOrganizations";
+import PlatformBilling from "./pages/platform/PlatformBilling";
+import PlatformSessions from "./pages/platform/PlatformSessions";
+import PlatformPlans from "./pages/platform/PlatformPlans";
 import AccountAdmin from "./pages/AccountAdmin";
+import Landing from "./pages/Landing";
+import Subscribe from "./pages/Subscribe";
+import Payment from "./pages/Payment";
 
 import { getUser, isAuthenticated } from "./utils/auth";
 import { ToastProvider } from "./context/ToastContext";
@@ -35,39 +43,48 @@ function ProtectedRoute({ element, roles }) {
   return element;
 }
 
+const router = createBrowserRouter([
+  { path: "/", element: <Landing /> },
+  { path: "/login", element: <Login /> },
+  { path: "/subscribe/:planSlug", element: <Subscribe /> },
+  { path: "/payment/:invoiceId", element: <Payment /> },
+  {
+    element: <AppLayout />,
+    children: [
+      { path: "/dashboard", element: <ProtectedRoute element={<Dashboard />} /> },
+      { path: "/templates", element: <ProtectedRoute element={<Templates />} /> },
+
+      { path: "/recipients", element: <ProtectedRoute element={<RecipientsPage />} /> },
+      { path: "/recipients/lists", element: <ProtectedRoute element={<RecipientListsPage />} /> },
+      { path: "/recipients/import", element: <ProtectedRoute roles={["owner", "admin", "manager"]} element={<ImportRecipientsPage />} /> },
+
+      { path: "/campaigns", element: <ProtectedRoute element={<CampaignsPage />} /> },
+      { path: "/campaigns/new", element: <ProtectedRoute roles={["owner", "admin", "manager"]} element={<CreateCampaignPage />} /> },
+      { path: "/campaigns/:campaignId", element: <ProtectedRoute element={<CampaignDetailsPage />} /> },
+
+      { path: "/smtp", element: <ProtectedRoute element={<SMTPPage />} /> },
+
+      { path: "/reports", element: <ProtectedRoute element={<ReportsPage />} /> },
+      { path: "/reports/campaigns/:campaignId", element: <ProtectedRoute element={<CampaignReportPage />} /> },
+
+      { path: "/settings", element: <ProtectedRoute roles={["admin"]} element={<SettingsPage />} /> },
+      {
+        path: "/platform",
+        element: <ProtectedRoute roles={["owner"]} element={<PlatformAdmin />} />,
+        children: [
+          { index: true, element: <PlatformOverview /> },
+          { path: "organizations", element: <PlatformOrganizations /> },
+          { path: "plans", element: <PlatformPlans /> },
+          { path: "billing", element: <PlatformBilling /> },
+          { path: "sessions", element: <PlatformSessions /> },
+        ],
+      },
+      { path: "/account", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<AccountAdmin />} /> },
+    ],
+  },
+  { path: "*", element: <Navigate to="/" replace /> },
+]);
+
 export default function App() {
-  return (
-    <ToastProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
-          <Route path="/templates" element={<ProtectedRoute element={<Templates />} />} />
-
-          {/* Recipients Routes */}
-          <Route path="/recipients" element={<ProtectedRoute element={<RecipientsPage />} />} />
-          <Route path="/recipients/lists" element={<ProtectedRoute element={<RecipientListsPage />} />} />
-          <Route path="/recipients/import" element={<ProtectedRoute roles={["owner", "admin", "manager"]} element={<ImportRecipientsPage />} />} />
-
-          {/* Campaigns Routes */}
-          <Route path="/campaigns" element={<ProtectedRoute element={<CampaignsPage />} />} />
-          <Route path="/campaigns/new" element={<ProtectedRoute roles={["owner", "admin", "manager"]} element={<CreateCampaignPage />} />} />
-          <Route path="/campaigns/:campaignId" element={<ProtectedRoute element={<CampaignDetailsPage />} />} />
-
-          {/* SMTP Route */}
-          <Route path="/smtp" element={<ProtectedRoute element={<SMTPPage />} />} />
-
-          {/* Reports Routes */}
-          <Route path="/reports" element={<ProtectedRoute element={<ReportsPage />} />} />
-          <Route path="/reports/campaigns/:campaignId" element={<ProtectedRoute element={<CampaignReportPage />} />} />
-
-          {/* Settings Route */}
-          <Route path="/settings" element={<ProtectedRoute roles={["admin"]} element={<SettingsPage />} />} />
-          <Route path="/platform" element={<ProtectedRoute roles={["owner"]} element={<PlatformAdmin />} />} />
-          <Route path="/account" element={<ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<AccountAdmin />} />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </ToastProvider>
-  );
+  return <ToastProvider><RouterProvider router={router} /></ToastProvider>;
 }

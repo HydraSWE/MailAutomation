@@ -36,7 +36,7 @@ export default function Navbar({ onToggleMobileMenu }) {
 
         <div className="truncate">
           <strong className="text-slate-100 font-semibold text-xs sm:text-sm md:text-base truncate block sm:inline">
-            Mail Automation System
+          Mail Flow
           </strong>
           <span className="text-xs text-slate-400 hidden md:inline"> / Operations Console</span>
         </div>

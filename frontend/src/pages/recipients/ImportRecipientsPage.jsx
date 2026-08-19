@@ -13,6 +13,7 @@ import {
   Share2,
 } from "lucide-react";
 import FileUpload from "../../components/common/FileUpload";
+import CustomSelect from "../../components/common/CustomSelect";
 import recipientsApi from "../../services/recipientsApi";
 import { useToast } from "../../hooks/useToast";
 
@@ -356,21 +357,17 @@ export default function ImportRecipientsPage() {
               )}
             </div>
 
-            <select
+            <CustomSelect
               value={selectedListId}
-              onChange={(e) => setSelectedListId(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-            >
-              {lists.length === 0 ? (
-                <option value="">Auto-create General Contacts</option>
-              ) : (
-                lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.list_name || l.name} ({l.recipient_count || 0} existing)
-                  </option>
-                ))
-              )}
-            </select>
+              onChange={setSelectedListId}
+              options={lists.length === 0
+                ? [{ value: "", label: "Auto-create General Contacts" }]
+                : lists.map((list) => ({
+                  value: list.id,
+                  label: `${list.list_name || list.name} (${list.recipient_count || 0} existing)`,
+                }))}
+              ariaLabel="Target recipient list"
+            />
           </div>
 
           <div>
@@ -456,20 +453,15 @@ export default function ImportRecipientsPage() {
                 <label className="block text-xs font-semibold text-slate-200">
                   {field.label} {field.required && <span className="text-rose-400">*</span>}
                 </label>
-                <select
+                <CustomSelect
                   value={columnMapping[field.key]}
-                  onChange={(e) =>
-                    setColumnMapping({ ...columnMapping, [field.key]: e.target.value })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="">Do Not Import</option>
-                  {headers.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(header) => setColumnMapping({ ...columnMapping, [field.key]: header })}
+                  options={[
+                    { value: "", label: "Do Not Import" },
+                    ...headers.map((header) => ({ value: header, label: header })),
+                  ]}
+                  ariaLabel={`${field.label} mapping`}
+                />
               </div>
             ))}
           </div>

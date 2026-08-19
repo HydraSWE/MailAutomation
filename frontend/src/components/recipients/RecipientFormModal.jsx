@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FormModal from "../common/FormModal";
+import CustomSelect from "../common/CustomSelect";
 import recipientsApi from "../../services/recipientsApi";
 import { useToast } from "../../hooks/useToast";
 
@@ -194,35 +195,29 @@ export default function RecipientFormModal({
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               Recipient List
             </label>
-            <select
+            <CustomSelect
               value={formData.list_id}
-              onChange={(e) => setFormData({ ...formData, list_id: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-            >
-              {lists.length === 0 ? (
-                <option value="">Auto-create General Contacts</option>
-              ) : (
-                lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.list_name || l.name}
-                  </option>
-                ))
-              )}
-            </select>
+              onChange={(listId) => setFormData({ ...formData, list_id: listId })}
+              options={lists.length === 0
+                ? [{ value: "", label: "Auto-create General Contacts" }]
+                : lists.map((list) => ({ value: list.id, label: list.list_name || list.name }))}
+              ariaLabel="Recipient list"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Status</label>
-            <select
+            <CustomSelect
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="unsubscribed">Unsubscribed</option>
-              <option value="bounced">Bounced</option>
-            </select>
+              onChange={(status) => setFormData({ ...formData, status })}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+                { value: "unsubscribed", label: "Unsubscribed" },
+                { value: "bounced", label: "Bounced" },
+              ]}
+              ariaLabel="Recipient status"
+            />
           </div>
         </div>
 

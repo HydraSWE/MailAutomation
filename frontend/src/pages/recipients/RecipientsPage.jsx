@@ -22,6 +22,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import RecipientFormModal from "../../components/recipients/RecipientFormModal";
 import BulkActionModal from "../../components/recipients/BulkActionModal";
 import FormModal from "../../components/common/FormModal";
+import CustomSelect from "../../components/common/CustomSelect";
 import recipientsApi from "../../services/recipientsApi";
 import { usePagination } from "../../hooks/usePagination";
 import { useModal } from "../../hooks/useModal";
@@ -579,31 +580,31 @@ export default function RecipientsPage() {
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               Export Range
             </label>
-            <select
+            <CustomSelect
               value={exportScope}
-              onChange={(e) => setExportScope(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100"
-            >
-              <option value="filtered">Current Filtered Results ({totalItems})</option>
-              <option value="selected" disabled={selectedIds.length === 0}>
-                Selected Recipients ({selectedIds.length})
-              </option>
-              <option value="all">Entire List</option>
-            </select>
+              onChange={setExportScope}
+              options={[
+                { value: "filtered", label: `Current Filtered Results (${totalItems})` },
+                { value: "selected", label: `Selected Recipients (${selectedIds.length})`, disabled: selectedIds.length === 0 },
+                { value: "all", label: "Entire List" },
+              ]}
+              ariaLabel="Export range"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               File Format
             </label>
-            <select
+            <CustomSelect
               value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100"
-            >
-              <option value="csv">CSV (.csv)</option>
-              <option value="xlsx">Excel (.xlsx)</option>
-            </select>
+              onChange={setExportFormat}
+              options={[
+                { value: "csv", label: "CSV (.csv)" },
+                { value: "xlsx", label: "Excel (.xlsx)" },
+              ]}
+              ariaLabel="Export file format"
+            />
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">

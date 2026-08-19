@@ -84,7 +84,7 @@ export default function Login() {
               </div>
               <div>
                 <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-                  MailAutomation <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">v2.0</span>
+              Mail Flow <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">v2.0</span>
                 </span>
                 <p className="text-xs text-slate-400">Enterprise Campaign Dispatch Engine</p>
               </div>

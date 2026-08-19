@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import FormModal from "../common/FormModal";
+import CustomSelect from "../common/CustomSelect";
 import recipientsApi from "../../services/recipientsApi";
 import { useToast } from "../../hooks/useToast";
 
@@ -65,16 +66,17 @@ export default function BulkActionModal({
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               Select New Status
             </label>
-            <select
+            <CustomSelect
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="">Select status...</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="unsubscribed">Unsubscribed</option>
-            </select>
+              onChange={setValue}
+              options={[
+                { value: "", label: "Select status..." },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+                { value: "unsubscribed", label: "Unsubscribed" },
+              ]}
+              ariaLabel="Select new status"
+            />
           </div>
         )}
 
@@ -83,18 +85,15 @@ export default function BulkActionModal({
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               Select Target Recipient List
             </label>
-            <select
+            <CustomSelect
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="">Select list...</option>
-              {lists.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              onChange={setValue}
+              options={[
+                { value: "", label: "Select list..." },
+                ...lists.map((list) => ({ value: list.id, label: list.name })),
+              ]}
+              ariaLabel="Select target recipient list"
+            />
           </div>
         )}
 

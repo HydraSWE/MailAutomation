@@ -8,7 +8,7 @@ from common.permissions import OwnerOnly, OwnerOrAdmin
 from common.tenancy import is_owner
 from users.serializers import UserSerializer
 from .models import Organization, OrganizationUsage
-from .serializers import OrganizationSerializer, OrganizationUsageSerializer
+from .serializers import BillingConfigurationSerializer, OrganizationSerializer, OrganizationUsageSerializer
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -66,3 +66,21 @@ class AccountSummaryView(APIView):
         if not organization:
             return Response({"detail": "No organization selected."}, status=400)
         return Response(OrganizationSerializer(organization).data)
+
+
+class BillingConfigurationView(APIView):
+    permission_classes = [OwnerOnly]
+
+    def get_object(self):
+        from billing.configuration import get_billing_configuration
+
+        return get_billing_configuration()
+
+    def get(self, request):
+        return Response(BillingConfigurationSerializer(self.get_object()).data)
+
+    def patch(self, request):
+        serializer = BillingConfigurationSerializer(self.get_object(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=request.user)
+        return Response(serializer.data)

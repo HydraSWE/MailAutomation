@@ -1,10 +1,10 @@
 services:
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: mailhog
+    expose:
+      - "1025"
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
     restart: unless-stopped
   db:
     image: postgres:16-alpine
@@ -43,6 +43,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   celery:
     build:
@@ -50,13 +56,17 @@ services:
       dockerfile: backend/Dockerfile
     command: celery -A config worker -l INFO --concurrency=4
     env_file: .env
+    environment:
+      SKIP_MIGRATIONS: "1"
     volumes:
       - ./backend:/app
       - ./media:/app/media
       - ./logs:/app/logs
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   celery-beat:
     build:
@@ -64,11 +74,15 @@ services:
       dockerfile: backend/Dockerfile
     command: celery -A config beat -l INFO
     env_file: .env
+    environment:
+      SKIP_MIGRATIONS: "1"
     volumes:
       - ./backend:/app
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   frontend:
     build:
@@ -81,7 +95,8 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

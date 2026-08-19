@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -26,10 +27,15 @@ const processQueue = (error, token = null) => {
 };
 
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const method = (config.method || "get").toLowerCase();
+    if (!["get", "head", "options", "trace"].includes(method) && typeof document !== "undefined") {
+      const csrf = document.cookie.split("; ").find((row) => row.startsWith("csrftoken="))?.split("=")[1] || "";
+      if (csrf) config.headers["X-CSRFToken"] = decodeURIComponent(csrf);
     }
     return config;
   },

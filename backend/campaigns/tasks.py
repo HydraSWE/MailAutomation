@@ -21,7 +21,7 @@ def dispatch_scheduled_campaigns():
 @shared_task(bind=True)
 def launch_campaign(self, campaign_id):
     with transaction.atomic():
-        campaign = Campaign.objects.select_for_update().select_related("organization", "recipient_list", "smtp").get(pk=campaign_id)
+        campaign = Campaign.objects.select_for_update(of=("self",)).select_related("organization", "recipient_list", "smtp").get(pk=campaign_id)
         if campaign.status in {Campaign.Status.CANCELLED, Campaign.Status.COMPLETED, Campaign.Status.RUNNING}:
             return {"detail": f"Campaign is already {campaign.status}."}
         count = campaign.recipient_list.recipients.filter(status="active", organization=campaign.organization).count() if campaign.recipient_list else 0

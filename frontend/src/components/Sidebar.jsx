@@ -54,7 +54,7 @@ export default function Sidebar({ isOpen, onClose }) {
               </div>
               <div>
                 <span className="font-bold text-white tracking-tight flex items-center gap-1 text-base">
-                  MailFlow <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              Mail Flow <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 </span>
                 <span className="text-[10px] text-slate-400 block font-mono">v2.0 Enterprise</span>
               </div>

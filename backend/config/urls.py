@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 
 def health_check(request):
-    return HttpResponse("MailAutomation API is running")
+    return HttpResponse("Mail Flow API is running")
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/", include("users.urls")),
     path("api/", include("common.urls")),
     path("api/reports/", include("reports.urls")),
+    path("api/billing/", include("billing.urls")),
 ]
 
 if settings.DEBUG:

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from decimal import Decimal
 
 
 class Organization(models.Model):
@@ -11,10 +12,12 @@ class Organization(models.Model):
     name = models.CharField(max_length=255, unique=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     max_users = models.PositiveIntegerField(default=5)
+    max_admins = models.PositiveIntegerField(default=1)
     max_smtp_accounts = models.PositiveIntegerField(default=2)
     max_recipients = models.PositiveIntegerField(default=10000)
-    daily_email_limit = models.PositiveIntegerField(default=1000)
+    daily_email_limit = models.PositiveIntegerField(default=1000, help_text="Zero means no daily limit.")
     monthly_email_limit = models.PositiveIntegerField(default=30000)
+    weekly_email_limit = models.PositiveIntegerField(default=0, help_text="Zero means no weekly limit.")
     max_campaigns_per_day = models.PositiveIntegerField(default=10)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -57,7 +60,7 @@ class SystemSetting(models.Model):
     )
 
     # General
-    app_name = models.CharField(max_length=255, default="Mail Automation Engine")
+    app_name = models.CharField(max_length=255, default="Mail Flow")
     company_name = models.CharField(max_length=255, default="Acme Enterprises Inc.")
     default_sender_name = models.CharField(max_length=255, default="Marketing Team")
     default_sender_email = models.EmailField(default="marketing@acme.com")
@@ -100,3 +103,30 @@ class SystemSetting(models.Model):
 
     def __str__(self) -> str:
         return f"System Setting ({self.app_name})"
+
+
+class BillingConfiguration(models.Model):
+    """Singleton platform billing configuration. API credentials are encrypted separately."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    usdt_bdt_rate = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal("122.0000"))
+    payment_evm_wallet = models.CharField(max_length=128)
+    payment_tron_wallet = models.CharField(max_length=128)
+    payment_ton_wallet = models.CharField(max_length=128)
+    encrypted_tron_api_key = models.TextField(blank=True)
+    encrypted_toncenter_api_key = models.TextField(blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="billing_configuration_updates",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Platform billing configuration"

@@ -1,6 +1,7 @@
 import csv
 import io
 import ssl
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -10,7 +11,7 @@ from openpyxl import load_workbook
 from rest_framework.test import APIClient
 from campaigns.models import Campaign, CampaignLog
 from campaigns.tasks import send_campaign_email
-from common.models import Organization, OrganizationUsage
+from common.models import BillingConfiguration, Organization, OrganizationUsage
 from email_engine.sender import _connection, send_log_email
 from recipients.exporter import export_csv
 from recipients.models import Recipient, RecipientList
@@ -23,7 +24,7 @@ User = get_user_model()
 
 class SaaSSecurityTests(TestCase):
     def setUp(self):
-        self.org_a = Organization.objects.create(name="Tenant A", max_users=2, max_smtp_accounts=1, max_recipients=2, daily_email_limit=2, monthly_email_limit=3)
+        self.org_a = Organization.objects.create(name="Tenant A", max_users=1, max_smtp_accounts=1, max_recipients=2, daily_email_limit=2, monthly_email_limit=3)
         self.org_b = Organization.objects.create(name="Tenant B")
         self.owner = User.objects.create_user(username="owner", email="owner@example.com", password="StrongPass!234", role="owner", is_staff=True, is_superuser=True)
         self.admin = User.objects.create_user(username="admin-a", email="admin-a@example.com", password="StrongPass!234", role="admin", organization=self.org_a)
@@ -35,8 +36,16 @@ class SaaSSecurityTests(TestCase):
 
     def test_owner_creates_organization_and_first_admin(self):
         self.authenticate(self.owner)
-        response = self.client.post("/api/organizations/", {"name": "New Customer", "max_users": 3}, format="json")
+        response = self.client.post(
+            "/api/organizations/",
+            {"name": "New Customer", "plan_slug": "basic", "max_users": 999},
+            format="json",
+        )
         self.assertEqual(response.status_code, 201)
+        organization = Organization.objects.get(pk=response.data["id"])
+        self.assertEqual(organization.subscription.plan.slug, "basic")
+        self.assertEqual(organization.max_users, 5)
+        self.assertEqual(organization.max_recipients, organization.subscription.plan.max_recipients)
         response = self.client.post(
             f"/api/organizations/{response.data['id']}/create-admin/",
             {"username": "new-admin", "name": "New Admin", "email": "new@example.com", "password": "StrongPass!234"},
@@ -44,6 +53,70 @@ class SaaSSecurityTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["role"], "admin")
+
+    def test_only_owner_can_update_encrypted_billing_configuration(self):
+        self.authenticate(self.owner)
+        response = self.client.patch("/api/platform/billing-configuration/", {
+            "usdt_bdt_rate": "125.5000",
+            "payment_evm_wallet": "0x1111111111111111111111111111111111111111",
+            "payment_tron_wallet": "TUpdatedReceivingWallet",
+            "payment_ton_wallet": "UQUpdatedReceivingWallet",
+            "tron_api_key": "tron-secret-value",
+            "toncenter_api_key": "ton-secret-value",
+        }, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["tron_api_key_configured"])
+        self.assertTrue(response.data["toncenter_api_key_configured"])
+        self.assertNotIn("tron_api_key", response.data)
+        self.assertNotIn("toncenter_api_key", response.data)
+        config = BillingConfiguration.objects.get(pk=1)
+        self.assertNotIn("tron-secret-value", config.encrypted_tron_api_key)
+        self.assertEqual(config.updated_by, self.owner)
+
+        self.authenticate(self.admin)
+        forbidden = self.client.patch(
+            "/api/platform/billing-configuration/", {"usdt_bdt_rate": "1.0000"}, format="json"
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+    def test_only_owner_can_manage_public_pricing_plans(self):
+        self.authenticate(self.owner)
+        plans = self.client.get("/api/billing/platform/plans/")
+        self.assertEqual(plans.status_code, 200)
+        premium = next(plan for plan in plans.data["results"] if plan["slug"] == "premium")
+        updated = self.client.patch(
+            f"/api/billing/platform/plans/{premium['id']}/",
+            {"price_bdt": 4999, "email_limit": 75000, "max_recipients": 80000, "display_order": 9},
+            format="json",
+        )
+        self.assertEqual(updated.status_code, 200, updated.data)
+        public = self.client.get("/api/billing/plans/")
+        public_premium = next(plan for plan in public.data if plan["slug"] == "premium")
+        self.assertEqual(public_premium["price_bdt"], 4999)
+        self.assertEqual(public_premium["email_limit"], 75000)
+
+        organization = Organization.objects.create(name="Premium Customer")
+        from billing.models import Plan, Subscription
+        from billing.services import apply_plan_to_organization
+        premium_model = Plan.objects.get(pk=premium["id"])
+        apply_plan_to_organization(organization, premium_model)
+        now = timezone.now()
+        Subscription.objects.create(
+            organization=organization, plan=premium_model,
+            current_period_start=now, current_period_end=now + timedelta(days=30),
+        )
+        propagated = self.client.patch(
+            f"/api/billing/platform/plans/{premium['id']}/", {"max_recipients": 90000}, format="json"
+        )
+        self.assertEqual(propagated.status_code, 200)
+        organization.refresh_from_db()
+        self.assertEqual(organization.max_recipients, 90000)
+
+        self.authenticate(self.admin)
+        forbidden = self.client.patch(
+            f"/api/billing/platform/plans/{premium['id']}/", {"price_bdt": 1}, format="json"
+        )
+        self.assertEqual(forbidden.status_code, 403)
 
     def test_admin_is_tenant_scoped_and_cannot_promote(self):
         foreign = EmailTemplate.objects.create(organization=self.org_b, title="Secret", subject="x", html="x", created_by=self.other_admin)
@@ -125,6 +198,19 @@ class SaaSSecurityTests(TestCase):
         log = CampaignLog.objects.create(organization=self.org_a, campaign=campaign, recipient=recipient, recipient_email=recipient.email)
         OrganizationUsage.objects.create(organization=self.org_a, date=timezone.localdate(), emails_sent=2)
         with self.assertRaisesRegex(RuntimeError, "Daily email quota exceeded"):
+            send_log_email(log.pk)
+
+    def test_send_worker_supports_unlimited_daily_and_enforces_weekly_quota(self):
+        campaign, recipient = self._campaign()
+        campaign.status = Campaign.Status.RUNNING
+        campaign.save(update_fields=["status"])
+        log = CampaignLog.objects.create(organization=self.org_a, campaign=campaign, recipient=recipient, recipient_email=recipient.email)
+        self.org_a.daily_email_limit = 0
+        self.org_a.weekly_email_limit = 1
+        self.org_a.monthly_email_limit = 100
+        self.org_a.save(update_fields=["daily_email_limit", "weekly_email_limit", "monthly_email_limit"])
+        OrganizationUsage.objects.create(organization=self.org_a, date=timezone.localdate(), emails_sent=1)
+        with self.assertRaisesRegex(RuntimeError, "Weekly email quota exceeded"):
             send_log_email(log.pk)
 
     def test_celery_task_rejects_cross_organization_log(self):

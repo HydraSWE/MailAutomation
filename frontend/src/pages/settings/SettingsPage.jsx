@@ -17,6 +17,7 @@ import settingsApi from "../../services/settingsApi";
 import DataTable from "../../components/common/DataTable";
 import FormModal from "../../components/common/FormModal";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import CustomSelect from "../../components/common/CustomSelect";
 import { useModal } from "../../hooks/useModal";
 import { useToast } from "../../hooks/useToast";
 import { getUser, setUser as updateStoredUser } from "../../utils/auth";
@@ -31,7 +32,7 @@ export default function SettingsPage() {
   // Settings State
   const [settings, setSettings] = useState({
     // General
-    app_name: "Mail Automation Engine",
+    app_name: "Mail Flow",
     company_name: "Acme Enterprises Inc.",
     default_sender_name: "Marketing Team",
     default_sender_email: "marketing@acme.com",
@@ -660,16 +661,17 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">System Role</label>
-                <select
+                <CustomSelect
                   value={userData.role}
-                  onChange={(e) => setUserData({ ...userData, role: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 cursor-pointer"
-                >
-                  <option value="Admin">Admin</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Editor">Editor</option>
-                  <option value="Viewer">Viewer</option>
-                </select>
+                  onChange={(role) => setUserData({ ...userData, role })}
+                  options={[
+                    { value: "Admin", label: "Admin" },
+                    { value: "Manager", label: "Manager" },
+                    { value: "Editor", label: "Editor" },
+                    { value: "Viewer", label: "Viewer" },
+                  ]}
+                  ariaLabel="System role"
+                />
               </div>
               <div className="flex justify-end pt-4 border-t border-slate-800">
                 <button type="button" onClick={userModal.closeModal} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium">

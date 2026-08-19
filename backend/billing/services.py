@@ -104,8 +104,12 @@ def verify_turnstile(token, request):
         raise ValidationError({"turnstile_token": "Checkout verification is temporarily unavailable."}) from exc
     if not payload.get("success"):
         raise ValidationError({"turnstile_token": "Checkout verification failed."})
-    expected_hostname = getattr(settings, "TURNSTILE_EXPECTED_HOSTNAME", "")
-    if expected_hostname and payload.get("hostname") != expected_hostname:
+    expected_hostnames = [
+        hostname.strip()
+        for hostname in getattr(settings, "TURNSTILE_EXPECTED_HOSTNAME", "").split(",")
+        if hostname.strip()
+    ]
+    if expected_hostnames and payload.get("hostname") not in expected_hostnames:
         raise ValidationError({"turnstile_token": "Checkout verification failed."})
     expected_action = getattr(settings, "TURNSTILE_CHECKOUT_ACTION", "")
     if expected_action and payload.get("action") != expected_action:
@@ -144,7 +148,9 @@ def start_checkout_email_verification(email, turnstile_token, *, request=None):
         code_digest=private_hash(code),
         expires_at=timezone.now() + timedelta(minutes=10),
     )
-    transaction.on_commit(lambda: send_checkout_otp(email, code))
+    from .tasks import send_checkout_otp_email
+
+    transaction.on_commit(lambda: cast(Any, send_checkout_otp_email).delay(email, code))
     audit_event("checkout_email_otp_started", request=request, metadata={"email_hash": private_hash(email)})
 
 
@@ -756,3 +762,4 @@ def fulfill_paid_invoice(invoice_id, transfer):
 
     transaction.on_commit(lambda: cast(Any, send_payment_confirmation_email).delay(str(invoice.pk)))
     return invoice
+### This iss nothing

@@ -16,13 +16,13 @@ from rest_framework.views import APIView
 from rest_framework import viewsets
 from common.permissions import OwnerOnly
 
-from .blockchain import VerificationError, verify_invoice_transfer
+from .blockchain import VerificationError, inspect_bsc_wallet_transfer, verify_invoice_transfer
 from .models import PaymentInvoice, PaymentTransferLedger, Plan
 from .serializers import (
     AccountInvoiceCreateSerializer, CheckoutEmailStartSerializer, CheckoutEmailVerifySerializer,
     FreeSignupSerializer, InvoiceCreateSerializer, InvoiceRecoverSerializer, InvoiceReplaceSerializer,
     InvoiceSerializer, ManualReviewActionSerializer, PaymentTransferLedgerSerializer, PlanAdminSerializer,
-    PlanSerializer, TransactionSubmissionSerializer,
+    PlanSerializer, BscTransactionInspectSerializer, TransactionSubmissionSerializer,
 )
 from .services import (
     authorize_checkout_session, cancel_invoice, consume_precheckout_session, exchange_invoice_code,
@@ -34,6 +34,10 @@ from .services import (
 
 def _cookie_name(name):
     return checkout_cookie_name(name)
+
+
+def _checkout_cookie_samesite():
+    return getattr(settings, "CHECKOUT_SESSION_COOKIE_SAMESITE", "None" if settings.CHECKOUT_SESSION_COOKIE_SECURE else "Lax")
 
 
 class CsrfProtectedAPIView(APIView):
@@ -91,6 +95,27 @@ class PaymentReviewViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(PaymentTransferLedgerSerializer(ledger).data)
 
 
+class BscTransactionInspectView(APIView):
+    permission_classes = [OwnerOnly]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "transaction_verify"
+
+    def post(self, request):
+        serializer = BscTransactionInspectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated_data = cast(dict[str, Any], serializer.validated_data or {})
+        try:
+            return Response(inspect_bsc_wallet_transfer(validated_data["transaction"]))
+        except VerificationError as exc:
+            return Response({
+                "found": False,
+                "matched_wallet": False,
+                "reason": str(exc),
+                "transfers": [],
+                "matching_transfers": [],
+            }, status=400)
+
+
 class FreeSignupView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -146,7 +171,7 @@ class CheckoutEmailVerifyView(CsrfProtectedAPIView):
             max_age=20 * 60,
             secure=settings.CHECKOUT_SESSION_COOKIE_SECURE,
             httponly=True,
-            samesite="Strict",
+            samesite=_checkout_cookie_samesite(),
             path="/",
         )
         return response
@@ -184,7 +209,11 @@ class InvoiceCreateView(CsrfProtectedAPIView):
         invoice, token, created = serializer.save()
         data = dict(InvoiceSerializer(invoice).data)
         response = Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
-        response.delete_cookie(_cookie_name(settings.PRECHECKOUT_SESSION_COOKIE_NAME), path="/")
+        response.delete_cookie(
+            _cookie_name(settings.PRECHECKOUT_SESSION_COOKIE_NAME),
+            path="/",
+            samesite=_checkout_cookie_samesite(),
+        )
         return _set_checkout_cookie(response, token)
 
 
@@ -232,7 +261,7 @@ def _set_checkout_cookie(response, token):
         max_age=12 * 60 * 60,
         secure=settings.CHECKOUT_SESSION_COOKIE_SECURE,
         httponly=True,
-        samesite="Strict",
+        samesite=_checkout_cookie_samesite(),
         path="/",
     )
     return response
@@ -333,6 +362,8 @@ class InvoiceSessionExchangeView(CsrfProtectedAPIView):
             invoice, session_token = exchange_invoice_code(invoice_id, code, request=request)
         except PaymentInvoice.DoesNotExist:
             return Response({"detail": "Invoice not found."}, status=404)
+        except DRFValidationError as exc:
+            return Response(exc.detail, status=401)
         response = _invoice_response(_expire_if_needed(invoice))
         return _set_checkout_cookie(response, session_token)
 

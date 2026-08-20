@@ -1,6 +1,8 @@
 import hashlib
 import hmac
+import json
 import secrets
+import time
 import uuid
 from base64 import urlsafe_b64encode
 from datetime import timedelta
@@ -125,6 +127,29 @@ def verify_turnstile(token, request):
 
 
 def send_checkout_otp(email, code):
+    relay_url = getattr(settings, "MAIL_FLOW_OTP_RELAY_URL", "")
+    relay_secret = getattr(settings, "MAIL_FLOW_OTP_RELAY_SECRET", "")
+    if relay_url and relay_secret:
+        timestamp = str(int(time.time()))
+        body = {
+            "email": email,
+            "code": code,
+            "timestamp": timestamp,
+        }
+        signed_payload = json.dumps(body, separators=(",", ":"), sort_keys=True)
+        signature = hmac.new(relay_secret.encode(), signed_payload.encode(), hashlib.sha256).hexdigest()
+        response = requests.post(
+            relay_url,
+            json=body,
+            headers={
+                "X-Mail-Flow-Signature": signature,
+                "X-Mail-Flow-Timestamp": timestamp,
+            },
+            timeout=getattr(settings, "MAIL_FLOW_OTP_RELAY_TIMEOUT", 10),
+        )
+        response.raise_for_status()
+        return
+
     send_mail(
         "Verify your Mail Flow checkout",
         f"Your Mail Flow checkout code is {code}. It expires in 10 minutes.",
@@ -318,16 +343,17 @@ def exchange_invoice_code(invoice_id, code, *, request=None):
     submitted_digest = invoice_token_digest(code)
     access_code = InvoiceAccessCode.objects.select_for_update().filter(
         invoice=invoice,
-        used_at__isnull=True,
         revoked_at__isnull=True,
         expires_at__gt=timezone.now(),
+        code_digest=submitted_digest,
     ).order_by("-created_at").first()
-    if not access_code or not hmac.compare_digest(submitted_digest, access_code.code_digest):
+    if not access_code:
         audit_event("checkout_code_rejected", invoice=invoice, request=request)
         raise ValidationError({"detail": "Invoice access is unauthorized."})
-    access_code.used_at = timezone.now()
-    access_code.encrypted_delivery_copy = ""
-    access_code.save(update_fields=("used_at", "encrypted_delivery_copy"))
+    if not access_code.used_at:
+        access_code.used_at = timezone.now()
+        access_code.encrypted_delivery_copy = ""
+        access_code.save(update_fields=("used_at", "encrypted_delivery_copy"))
     invoice.access_token_last_used_at = timezone.now()
     invoice.save(update_fields=("access_token_last_used_at", "updated_at"))
     session_token = create_checkout_session(invoice)

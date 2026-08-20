@@ -16,4 +16,3 @@ backups/*
 celerybeat-schedule
 .api_tokens.json
 *.token
-.vscode/

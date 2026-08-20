@@ -66,9 +66,8 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`sidebar fixed lg:sticky top-0 left-0 z-50 h-screen w-64 lg:w-60 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between transition-transform duration-300 ease-in-out ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`sidebar fixed lg:sticky top-0 left-0 z-50 h-screen w-64 lg:w-60 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div>
           {/* Brand Header */}
@@ -79,7 +78,7 @@ export default function Sidebar({ isOpen, onClose }) {
               </div>
               <div>
                 <span className="font-bold text-white tracking-tight flex items-center gap-1 text-base">
-              Mail Flow <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Mail Flow <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 </span>
                 <span className="text-[10px] text-slate-400 block font-mono">v2.0 Enterprise</span>
               </div>
@@ -103,10 +102,9 @@ export default function Sidebar({ isOpen, onClose }) {
                 to={to}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    isActive
-                      ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20 font-semibold shadow-sm"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                    ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20 font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
                   }`
                 }
               >
@@ -134,7 +132,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 onClick={onClose}
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-500/70 px-3 py-2.5 text-sm font-bold text-indigo-300 transition-colors hover:bg-indigo-500/10 hover:text-indigo-200"
               >
-                {isFreePlan ? "Upgrade Plan" : "Manage Plan"} <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4" />  {isFreePlan ? "Upgrade Plan" : "Manage Plan"}
               </NavLink>
             </div>
           )}

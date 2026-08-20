@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
+  ArrowRight,
   BarChart3,
   FileText,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { getUser } from "../utils/auth";
+import api from "../services/api";
 
 const items = [
   ["/dashboard", "Dashboard", LayoutDashboard, ["owner", "admin", "manager", "operator", "viewer"]],
@@ -29,6 +31,29 @@ const items = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const role = getUser().role;
+  const [account, setAccount] = useState(null);
+
+  useEffect(() => {
+    if (role === "owner") return;
+    let active = true;
+    api
+      .get("/account/")
+      .then((response) => {
+        if (active) setAccount(response.data);
+      })
+      .catch(() => {
+        if (active) setAccount(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [role]);
+
+  const planSlug = account?.subscription?.plan;
+  const planName = account?.subscription?.plan_name || "Current Plan";
+  const isFreePlan = planSlug === "free";
+  const showPlanCard = role !== "owner" && Boolean(account?.subscription);
+
   return (
     <>
       {/* Mobile Drawer Backdrop Overlay */}
@@ -92,12 +117,35 @@ export default function Sidebar({ isOpen, onClose }) {
           </nav>
         </div>
 
-        {/* Footer info */}
-        <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs text-slate-400 flex items-center justify-between">
-          <span>Engine Status</span>
-          <span className="flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
-          </span>
+        <div className="space-y-3">
+          {showPlanCard && (
+            <div className="rounded-2xl border border-slate-700/80 bg-slate-950/55 p-4 shadow-xl shadow-slate-950/20">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-base font-bold text-slate-100">{planName}</p>
+                <span className="rounded-full border border-amber-400/20 bg-amber-400/15 px-2.5 py-1 text-[11px] font-bold text-amber-200">
+                  {isFreePlan ? "Free" : "Active"}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                {isFreePlan ? "Upgrade for more sending power." : "Manage billing and plan limits."}
+              </p>
+              <NavLink
+                to="/account"
+                onClick={onClose}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-500/70 px-3 py-2.5 text-sm font-bold text-indigo-300 transition-colors hover:bg-indigo-500/10 hover:text-indigo-200"
+              >
+                {isFreePlan ? "Upgrade Plan" : "Manage Plan"} <ArrowRight className="h-4 w-4" />
+              </NavLink>
+            </div>
+          )}
+
+          {/* Footer info */}
+          <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs text-slate-400 flex items-center justify-between">
+            <span>Engine Status</span>
+            <span className="flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
+            </span>
+          </div>
         </div>
       </aside>
     </>

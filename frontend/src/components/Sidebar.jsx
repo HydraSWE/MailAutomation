@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BarChart3,
   FileText,
+  HelpCircle,
   LayoutDashboard,
   Mail,
   Settings,
@@ -26,6 +27,8 @@ const items = [
   ["/campaigns", "Campaigns", Mail, ["owner", "admin", "manager", "operator", "viewer"]],
   ["/smtp", "SMTP", Server, ["owner", "admin", "manager", "operator", "viewer"]],
   ["/reports", "Reports", BarChart3, ["owner", "admin", "manager", "operator", "viewer"]],
+  ["/support", "Help & Support", HelpCircle, ["admin", "manager", "operator", "viewer"]],
+  ["/mail-workspace", "Mail Workspace", Mail, ["owner", "admin"], "support_workspace"],
   ["/settings", "Settings", Settings, ["admin"]],
 ];
 
@@ -96,7 +99,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
           {/* Navigation Links */}
           <nav className="space-y-1">
-            {items.filter(([, , , roles]) => roles.includes(role)).map(([to, label, Icon]) => (
+            {items.filter(([, , , roles, feature]) => roles.includes(role) && (!feature || role === "owner" || (account?.support_workspace_enabled && account?.support_workspace_available))).map(([to, label, Icon]) => (
               <NavLink
                 key={to}
                 to={to}

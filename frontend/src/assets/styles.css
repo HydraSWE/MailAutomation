@@ -40,21 +40,6 @@ body {
   }
 }
 
-.sidebar {
-  background: #0f172a;
-  color: #fff;
-  padding: 22px 16px;
-  border-right: 1px solid #1e293b;
-}
-
-@media (min-width: 1024px) {
-  .sidebar {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-  }
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -453,18 +438,6 @@ tr:hover {
 }
 
 @media (max-width: 760px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-  .sidebar {
-    display: none;
-  }
-  .content {
-    padding: 18px;
-  }
-  .navbar {
-    padding: 0 18px;
-  }
   .stats-grid {
     grid-template-columns: 1fr;
   }

@@ -58,6 +58,23 @@ export default function Sidebar({ isOpen, onClose }) {
   const isFreePlan = planSlug === "free";
   const showPlanCard = role !== "owner" && Boolean(account?.subscription) && isFreePlan;
 
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("overflow-hidden");
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") onClose();
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.body.classList.remove("overflow-hidden");
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    } else {
+      document.body.classList.remove("overflow-hidden");
+    }
+  }, [isOpen, onClose]);
+
   return (
     <>
       {/* Mobile Drawer Backdrop Overlay */}
@@ -65,13 +82,14 @@ export default function Sidebar({ isOpen, onClose }) {
         <div
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation Drawer */}
       <aside
-        className={`sidebar fixed lg:sticky top-0 left-0 z-50 h-[100dvh] w-64 lg:w-60 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between transition-all duration-300 ease-in-out ${
-          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
+        className={`fixed inset-y-0 left-0 lg:sticky lg:top-0 z-50 h-[100dvh] w-64 lg:w-60 bg-slate-900 border-r border-slate-800 p-5 flex flex-col justify-between overflow-y-auto transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0 shadow-2xl shadow-slate-950/80" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         <div>

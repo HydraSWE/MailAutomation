@@ -1,4 +1,7 @@
-<![CDATA[# Mail Flow — Enterprise Email Campaign Platform
+# Mail Flow - Enterprise Email Campaign Platform
+<img width="1919" height="361" alt="1000218256" src="https://github.com/user-attachments/assets/0fee1faa-7c70-4d1f-bc22-b8593a140974" />
+<img width="2158" height="445" alt="1000218259" src="https://github.com/user-attachments/assets/4c115ce2-e607-41e6-aefd-b76ac5993638" />
+
 
 A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST Framework**, **PostgreSQL**, **Celery + Redis**, and **React (Vite)**. It ships with a full billing system that accepts on-chain **USDT** payments across four blockchains, a five-tier RBAC model, per-organization quota enforcement, click/unsubscribe tracking, a support-ticket desk, and a real-time platform administration console.
 
@@ -10,9 +13,6 @@ A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST 
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Quick Start (Docker)](#quick-start-docker)
-- [Local Development](#local-development)
-- [Environment Variables](#environment-variables)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Subscription Plans & Billing](#subscription-plans--billing)
 - [Email Engine](#email-engine)
@@ -24,7 +24,6 @@ A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST 
 - [Database Backups](#database-backups)
 - [API Reference](#api-reference)
 - [Security](#security)
-- [Production Deployment](#production-deployment)
 - [Responsible Use](#responsible-use)
 
 ---
@@ -127,27 +126,27 @@ A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     React (Vite) Frontend                       │
-│   Landing ─ Register ─ Subscribe ─ Payment ─ Dashboard Shell    │
-│    Templates ─ Recipients ─ Campaigns ─ SMTP ─ Reports          │
-│    Settings ─ Platform Admin ─ Account Admin ─ Notifications    │
-│    Help & Support ─ Mail Workspace                              │
+│                     React (Vite) Frontend                                   │
+│   Landing ─ Register ─ Subscribe ─ Payment ─ Dashboard Shell               │
+│    Templates ─ Recipients ─ Campaigns ─ SMTP ─ Reports                     │
+│    Settings ─ Platform Admin ─ Account Admin ─ Notifications               │
+│    Help & Support ─ Mail Workspace                                          │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ Axios (JWT via httpOnly cookies)
 ┌──────────────────────────▼──────────────────────────────────────┐
-│                  Django REST Framework API                       │
-│  Gunicorn ─ WhiteNoise ─ CORS ─ SecurityHeaders middleware      │
+│                  Django REST Framework API                                  │
+│  Gunicorn ─ WhiteNoise ─ CORS ─ SecurityHeaders middleware                 │
 ├─────────────────────────────────────────────────────────────────┤
-│  users ─ common ─ billing ─ campaigns ─ templates_app           │
-│  recipients ─ smtp_manager ─ email_engine ─ dashboard           │
-│  reports ─ support ─ platform_broadcasts ─ notifications        │
+│  users ─ common ─ billing ─ campaigns ─ templates_app                      │
+│  recipients ─ smtp_manager ─ email_engine ─ dashboard                      │
+│  reports ─ support ─ platform_broadcasts ─ notifications                   │
 └──────┬──────────────┬───────────────────┬───────────────────────┘
-       │              │                   │
-  PostgreSQL       Redis             Celery Workers
-  (via dj-db-url)  (broker + cache)  ├─ campaign dispatch
-                                     ├─ invoice expiry
-                                     ├─ broadcast delivery
-                                     └─ daily DB backup
+        │                 │                      │
+  PostgreSQL       Redis                   Celery Workers
+  (via dj-db-url)  (broker + cache)        ├─ campaign dispatch
+                                           ├─ invoice expiry
+                                           ├─ broadcast delivery
+                                           └─ daily DB backup
 ```
 
 ---
@@ -210,104 +209,6 @@ MailAutomation/
 ├── DEPLOYMENT.md            # Comprehensive deployment guide
 └── PRODUCTION_DEPLOYMENT.md # Quick production deployment checklist
 ```
-
----
-
-## Quick Start (Docker)
-
-```bash
-# 1. Clone and configure
-git clone <repo-url>
-cd MailAutomation
-cp .env.example .env
-
-# 2. Generate a Fernet encryption key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Paste the output into FIELD_ENCRYPTION_KEY in .env
-
-# 3. Build and run all services
-docker compose up --build
-```
-
-The configured `DJANGO_SUPERUSER_*` environment variables bootstrap the platform **owner** account on first run.
-
-| Service     | URL                          |
-|-------------|------------------------------|
-| API         | http://localhost:8000/api/   |
-| Django Admin| http://localhost:8000/admin/  |
-| Frontend    | http://localhost:5173/        |
-| MailHog UI  | http://localhost:8025/        |
-
-To create a superuser manually:
-
-```bash
-docker compose exec backend python manage.py createsuperuser
-```
-
----
-
-## Local Development
-
-### Backend
-
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r backend/requirements.txt
-cp .env.example .env
-
-cd backend
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
-
-Start Celery workers in separate terminals:
-
-```bash
-# Worker
-cd backend
-celery -A config worker -l INFO
-
-# Beat scheduler (for scheduled campaigns, invoice expiry, daily backups)
-cd backend
-celery -A config beat -l INFO
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend dev server runs at `http://localhost:5173` and proxies API calls to `http://localhost:8000/api`.
-
----
-
-## Environment Variables
-
-All configuration is driven by environment variables. See [`.env.example`](.env.example) for the complete list with inline documentation. Key groups:
-
-| Group                   | Key Variables                                                                            |
-|-------------------------|------------------------------------------------------------------------------------------|
-| **Core Django**         | `DJANGO_ENV`, `DJANGO_DEBUG`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`                |
-| **Database**            | `DATABASE_URL` (dj-database-url format)                                                  |
-| **Redis**               | `REDIS_URL`, `CACHE_REDIS_URL`, `CACHE_KEY_PREFIX`                                      |
-| **Encryption**          | `FIELD_ENCRYPTION_KEY` (Fernet key for SMTP passwords, tracking tokens)                  |
-| **CORS / CSRF**         | `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`                          |
-| **Auth Cookies**        | `AUTH_ACCESS_COOKIE_NAME`, `AUTH_REFRESH_COOKIE_NAME`, `AUTH_COOKIE_SAMESITE`             |
-| **Email Provider**      | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`    |
-| **Mail Flow Sender**    | `MAIL_FLOW_SENDER_NAME`, `MAIL_FLOW_SENDER_EMAIL`, `MAIL_FLOW_REPLY_TO`                 |
-| **External Relays**     | `MAIL_FLOW_OTP_RELAY_URL`, `MAIL_FLOW_CAMPAIGN_RELAY_URL`, `MAIL_FLOW_SMTP_TEST_RELAY_URL`|
-| **Media Storage**       | `MEDIA_STORAGE_BACKEND` (`filesystem` or `vercel_blob`), `BLOB_READ_WRITE_TOKEN`         |
-| **Campaign Engine**     | `EMAIL_BATCH_SIZE`, `EMAIL_SEND_DELAY_SECONDS`, `TRACKING_BASE_URL`                      |
-| **USDT Billing**        | `USDT_BDT_RATE`, `PAYMENT_*_WALLET`, `USDT_*_CONTRACT`, `*_RPC_URL`, `PAYMENT_NETWORK_*_ENABLED`|
-| **Turnstile**           | `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME`                                    |
-| **Superuser Bootstrap** | `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD`       |
-
 ---
 
 ## User Roles & Permissions
@@ -656,29 +557,6 @@ The platform includes an automated backup system:
 
 ---
 
-## Production Deployment
-
-See [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md) for the quick checklist, and [DEPLOYMENT.md](DEPLOYMENT.md) for the comprehensive deployment guide covering:
-
-- Required environment variables
-- Railway, Vercel, and self-hosted deployment options
-- Database migration order
-- Backup and restore procedures
-- Security hardening checklist
-- Tenant onboarding smoke test
-
-### Deliverability & Compliance Checklist
-
-1. Deploy Django behind HTTPS with a reverse proxy
-2. Use a managed secret store; rotate SMTP credentials and the encryption key
-3. Configure DKIM, SPF, DMARC, verified sender identities, and return-path handling
-4. Add domain-level and optional hourly throttling where required
-5. Set up provider webhooks and durable idempotency keys for delivery reconciliation
-6. Move media to S3-compatible storage and logs to centralized observability
-7. Add centralized audit logging, monitoring, alerting, and disaster-recovery drills
-
----
-
 ## Responsible Use
 
 > **Only send to recipients who have explicitly opted in.** Add unsubscribe handling, suppression lists, bounce processing, and jurisdiction-specific compliance controls before production use. Never use purchased or scraped address lists.
@@ -687,5 +565,4 @@ See [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md) for the quick checklist
 
 ## License
 
-Proprietary. All rights reserved.
-]]>
+Mail Flow. All rights reserved.

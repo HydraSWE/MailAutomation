@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Sliders,
   Mail,
@@ -1129,8 +1130,8 @@ export default function SettingsPage() {
         )}
 
       {/* 2FA Setup Modal (Accessible from any tab) */}
-      {showSetup2FA && setup2FAData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      {showSetup2FA && setup2FAData && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 relative">
             <button onClick={() => setShowSetup2FA(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -1216,12 +1217,13 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Disable 2FA Modal (Accessible from any tab) */}
-      {showDisable2FA && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      {showDisable2FA && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 relative">
             <button onClick={() => setShowDisable2FA(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2"><ShieldOff className="w-5 h-5 text-rose-400" />Disable Two-Factor Authentication</h3>
@@ -1251,12 +1253,13 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Regenerate Backup Codes Modal (Accessible from any tab) */}
-      {showRegenCodes && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      {showRegenCodes && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 relative">
             <button onClick={() => setShowRegenCodes(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-200"><X className="w-5 h-5" /></button>
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2"><RefreshCcw className="w-5 h-5 text-indigo-400" />Regenerate Backup Codes</h3>
@@ -1315,7 +1318,8 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

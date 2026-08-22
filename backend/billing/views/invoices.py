@@ -1,205 +1,5 @@
-from typing import Any, cast
-
-from django.conf import settings
-from django.db import transaction
-from django.middleware.csrf import get_token
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from django.utils import timezone
-from rest_framework import status
-from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.throttling import ScopedRateThrottle
-from rest_framework.views import APIView
-from rest_framework import viewsets
-from common.permissions import OwnerOnly
-
-from .blockchain import VerificationError, inspect_bsc_wallet_transfer, verify_invoice_transfer
-from .models import PaymentInvoice, PaymentTransferLedger, Plan
-from .serializers import (
-    AccountCustomInvoiceCreateSerializer, AccountInvoiceCreateSerializer, CheckoutEmailStartSerializer, CheckoutEmailVerifySerializer,
-    CustomInvoiceCreateSerializer, FreeSignupSerializer, InvoiceCreateSerializer, InvoiceRecoverSerializer, InvoiceReplaceSerializer,
-    InvoiceSerializer, ManualReviewActionSerializer, PaymentTransferLedgerSerializer, PlanAdminSerializer,
-    PlanSerializer, BscTransactionInspectSerializer, TransactionSubmissionSerializer,
-)
-from .services import (
-    authorize_checkout_session, cancel_invoice, consume_precheckout_session, exchange_invoice_code,
-    checkout_cookie_name, fulfill_paid_invoice, replace_invoice, resolve_manual_transfer,
-    provision_free_account, record_review_claim, serialize_invoice_access, start_checkout_email_verification,
-    verify_checkout_email,
-)
-
-
-def _cookie_name(name):
-    return checkout_cookie_name(name)
-
-
-def _checkout_cookie_samesite():
-    return getattr(settings, "CHECKOUT_SESSION_COOKIE_SAMESITE", "Lax")
-
-
-class CsrfProtectedAPIView(APIView):
-    @method_decorator(csrf_protect)
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
-
-
-class CsrfBootstrapView(APIView):
-    permission_classes = [AllowAny]
-
-    @method_decorator(ensure_csrf_cookie)
-    def get(self, request):
-        return Response({"csrfToken": get_token(request)})
-
-
-class PlanListView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        plans = Plan.objects.filter(is_active=True)
-        return Response(PlanSerializer(plans, many=True).data)
-
-
-class PlanAdminViewSet(viewsets.ModelViewSet):
-    serializer_class = PlanAdminSerializer
-    permission_classes = [OwnerOnly]
-    queryset = Plan.objects.all().order_by("display_order", "price_bdt")
-    http_method_names = ["get", "post", "put", "patch", "head", "options"]
-
-
-class PaymentReviewViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = PaymentTransferLedgerSerializer
-    permission_classes = [OwnerOnly]
-    queryset = PaymentTransferLedger.objects.select_related("invoice", "invoice__plan").all()
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        resolution = self.request.query_params.get("resolution")
-        if resolution:
-            queryset = queryset.filter(resolution=resolution)
-        return queryset
-
-    def action(self, request, pk=None):
-        ledger = self.get_object()
-        serializer = ManualReviewActionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ledger = resolve_manual_transfer(
-            ledger.pk,
-            serializer.validated_data["action"],
-            actor=request.user,
-            notes=serializer.validated_data.get("notes", ""),
-            refund_transaction_hash=serializer.validated_data.get("refund_transaction_hash", ""),
-        )
-        return Response(PaymentTransferLedgerSerializer(ledger).data)
-
-
-class BscTransactionInspectView(APIView):
-    permission_classes = [OwnerOnly]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "transaction_verify"
-
-    def post(self, request):
-        serializer = BscTransactionInspectSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = cast(dict[str, Any], serializer.validated_data or {})
-        try:
-            return Response(inspect_bsc_wallet_transfer(validated_data["transaction"]))
-        except VerificationError as exc:
-            return Response({
-                "found": False,
-                "matched_wallet": False,
-                "reason": str(exc),
-                "transfers": [],
-                "matching_transfers": [],
-            }, status=400)
-
-
-class FreeSignupView(APIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "public_signup"
-
-    def post(self, request):
-        serializer = FreeSignupSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        organization, user = provision_free_account(serializer.validated_data, request)
-
-        from rest_framework_simplejwt.tokens import RefreshToken
-        from users.models import UserLoginSession
-        from users.serializers import UserSerializer, _request_ip
-        import uuid
-
-        session_id = uuid.uuid4()
-        refresh = RefreshToken.for_user(user)
-        refresh["session_id"] = str(session_id)
-        refresh["role"] = user.role
-        refresh["organization_id"] = user.organization.id if user.organization else None
-        refresh["username"] = user.username
-        refresh["email"] = user.email
-        UserLoginSession.objects.create(
-            user=user,
-            session_id=session_id,
-            refresh_token_jti=str(refresh["jti"]),
-            ip_address=_request_ip(request),
-            user_agent=(request.META.get("HTTP_USER_AGENT", "")[:1000] if request else ""),
-        )
-
-        response = Response({
-            "detail": "Your free account is ready.",
-            "user": UserSerializer(user).data,
-            "organization_id": organization.pk,
-            "email": user.email,
-            "login_url": "/login",
-        }, status=status.HTTP_201_CREATED)
-        from users.views import _set_auth_cookies
-        return _set_auth_cookies(request, response, str(refresh.access_token), str(refresh))
-
-
-class CheckoutEmailStartView(CsrfProtectedAPIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "checkout_email"
-
-    def post(self, request):
-        serializer = CheckoutEmailStartSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = cast(dict[str, Any], serializer.validated_data or {})
-        start_checkout_email_verification(
-            validated_data["email"],
-            validated_data.get("turnstile_token", ""),
-            request=request,
-        )
-        return Response({"detail": "If the address can continue, a verification code will be sent shortly."}, status=202)
-
-
-class CheckoutEmailVerifyView(CsrfProtectedAPIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "checkout_email"
-
-    def post(self, request):
-        serializer = CheckoutEmailVerifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        validated_data = cast(dict[str, Any], serializer.validated_data or {})
-        token = verify_checkout_email(
-            validated_data["email"],
-            validated_data["code"],
-            request=request,
-        )
-        response = Response({"detail": "Email verified."}, status=202)
-        response.set_cookie(
-            key=_cookie_name(settings.PRECHECKOUT_SESSION_COOKIE_NAME),
-            value=token,
-            max_age=20 * 60,
-            secure=settings.CHECKOUT_SESSION_COOKIE_SECURE,
-            httponly=True,
-            samesite=_checkout_cookie_samesite(),
-            path="/",
-        )
-        return response
-
+from .common import *  # noqa: F401,F403
+from .common import _checkout_cookie_samesite, _cookie_name
 
 class InvoiceCreateView(CsrfProtectedAPIView):
     permission_classes = [AllowAny]
@@ -220,7 +20,7 @@ class InvoiceCreateView(CsrfProtectedAPIView):
                     status__in=(PaymentInvoice.Status.PENDING, PaymentInvoice.Status.VERIFYING, PaymentInvoice.Status.EXPIRED),
                 ).order_by("-created_at").first()
             if not existing:
-                from .services import normalized_org_name
+                from ..services import normalized_org_name
 
                 existing = PaymentInvoice.objects.filter(
                     normalized_customer_email=validated_data["email"],
@@ -260,7 +60,7 @@ class CustomInvoiceCreateView(CsrfProtectedAPIView):
                     status__in=(PaymentInvoice.Status.PENDING, PaymentInvoice.Status.VERIFYING, PaymentInvoice.Status.EXPIRED),
                 ).order_by("-created_at").first()
             if not existing:
-                from .services import normalized_org_name
+                from ..services import normalized_org_name
 
                 existing = PaymentInvoice.objects.filter(
                     normalized_customer_email=validated_data["email"],
@@ -360,7 +160,7 @@ def _expire_if_needed(invoice):
         invoice.status = PaymentInvoice.Status.EXPIRED
         invoice.password_hash = ""
         invoice.save(update_fields=("status", "password_hash", "updated_at"))
-        from .services import revoke_invoice_access
+        from ..services import revoke_invoice_access
 
         revoke_invoice_access(invoice)
     return invoice
@@ -383,7 +183,7 @@ def _mark_manual_review(invoice, transfer):
         "transaction_hash", "transfer_index", "verification_data", "verification_error",
         "password_hash", "status", "updated_at",
     ))
-    from .tasks import send_manual_review_email
+    from ..tasks import send_manual_review_email
 
     transaction.on_commit(lambda: cast(Any, send_manual_review_email).delay(str(invoice.pk)))
     return invoice
@@ -414,8 +214,8 @@ class CurrentInvoiceView(APIView):
         token = request.COOKIES.get(_cookie_name(settings.CHECKOUT_SESSION_COOKIE_NAME), "")
         if not token:
             return Response({"detail": "Invoice access is unauthorized."}, status=401)
-        from .services import invoice_token_digest
-        from .models import CheckoutSession
+        from ..services import invoice_token_digest
+        from ..models import CheckoutSession
 
         session = CheckoutSession.objects.select_related("invoice", "invoice__plan").filter(
             token_digest=invoice_token_digest(token),
@@ -512,7 +312,7 @@ class InvoiceRecoverView(CsrfProtectedAPIView):
     def post(self, request):
         serializer = InvoiceRecoverSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        from .tasks import send_recovery_email
+        from ..tasks import send_recovery_email
 
         validated_data = cast(dict[str, Any], serializer.validated_data or {})
         cast(Any, send_recovery_email).delay(validated_data["email"])
@@ -553,97 +353,4 @@ class InvoiceCancelView(CsrfProtectedAPIView):
         return Response(InvoiceSerializer(cancel_invoice(invoice)).data)
 
 
-class PublicLandingMonitorView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        from datetime import timedelta
-        from django.db.models import Q
-        from billing.configuration import get_billing_configuration
-        from campaigns.models import CampaignLog
-        from smtp_manager.models import SMTPAccount
-
-        config = get_billing_configuration()
-        if not getattr(config, "public_landing_monitor_active", True):
-            return Response({
-                "is_active": False,
-                "message": "Mail Flow is inactive - data not available",
-            })
-
-        now = timezone.now()
-        thirty_days_ago = now - timedelta(days=30)
-
-        # 30-day server-wide stats
-        sent_logs = CampaignLog.objects.filter(
-            status=CampaignLog.Status.SENT,
-            created_at__gte=thirty_days_ago
-        )
-        failed_logs = CampaignLog.objects.filter(
-            status=CampaignLog.Status.FAILED,
-            created_at__gte=thirty_days_ago
-        )
-        delivered_count = sent_logs.count()
-        failed_count = failed_logs.count()
-        total_attempts = delivered_count + failed_count
-
-        if total_attempts > 0:
-            success_rate = round((delivered_count / total_attempts) * 100, 1)
-        else:
-            success_rate = 100.0
-
-        in_queue_count = CampaignLog.objects.filter(
-            status__in=[CampaignLog.Status.PENDING, CampaignLog.Status.PROCESSING]
-        ).count()
-
-        # 12-day breakdown
-        daily_bars = []
-        for i in range(11, -1, -1):
-            day_date = (now - timedelta(days=i)).date()
-            day_start = timezone.make_aware(timezone.datetime.combine(day_date, timezone.datetime.min.time()))
-            day_end = timezone.make_aware(timezone.datetime.combine(day_date, timezone.datetime.max.time()))
-
-            day_sent = CampaignLog.objects.filter(
-                status=CampaignLog.Status.SENT,
-                created_at__gte=day_start,
-                created_at__lte=day_end
-            ).count()
-
-            day_failed = CampaignLog.objects.filter(
-                status=CampaignLog.Status.FAILED,
-                created_at__gte=day_start,
-                created_at__lte=day_end
-            ).count()
-
-            daily_bars.append({
-                "date": day_date.strftime("%Y-%m-%d"),
-                "label": day_date.strftime("%b %d"),
-                "delivered": day_sent,
-                "failed": day_failed,
-                "total": day_sent + day_failed,
-            })
-
-        max_day_volume = max([d["total"] for d in daily_bars] or [0])
-        for bar in daily_bars:
-            if max_day_volume > 0:
-                bar["percentage"] = max(15, round((bar["total"] / max_day_volume) * 100))
-            else:
-                bar["percentage"] = 25  # pleasant baseline aesthetic if no dispatch on that day
-
-        # SMTP Relay Health
-        active_routes = SMTPAccount.objects.filter(status=True).count()
-        delivery_incidents = failed_count
-
-        return Response({
-            "is_active": True,
-            "metrics": {
-                "delivered": delivered_count,
-                "success_rate": success_rate,
-                "in_queue": in_queue_count,
-            },
-            "daily_bars": daily_bars,
-            "relay_health": {
-                "active_routes": active_routes,
-                "delivery_incidents": delivery_incidents,
-            },
-        })
 

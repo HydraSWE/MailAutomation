@@ -47,7 +47,9 @@ export default function CampaignReportPage() {
         const sent = cData.sent_count || 0;
         const failed = cData.failed_count || 0;
         const pending = Math.max(0, total - (sent + failed));
-        const rate = (sent + failed) > 0 ? round((sent / (sent + failed)) * 100, 1) : 100.0;
+        const rate = (sent + failed) > 0
+          ? Math.round((sent / (sent + failed)) * 1000) / 10
+          : 100.0;
 
         setCampaignReport({
           campaign: cData,

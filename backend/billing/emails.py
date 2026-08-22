@@ -3,19 +3,42 @@ import hmac
 import json
 import os
 import time
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, TypedDict
 from urllib.parse import urljoin
 
 import requests
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import escape
+from django.utils.safestring import mark_safe
 
 from .models import PaymentInvoice, Subscription
 
 LOGO_URL = os.environ.get("LOGO_URL")
 MARK_URL = os.environ.get("MARK_URL")
+
+
+class EmailRowContext(TypedDict):
+    label: str
+    value: str
+    dark: bool
+    last: bool
+    accent: bool
+
+
+class EmailShellContext(TypedDict):
+    title: str
+    intro: str
+    rows: list[EmailRowContext]
+    cta_url: str
+    cta_label: str
+    custom_content: str
+    badge: str
+    footer_note: str
+    logo_url: Optional[str]
+    mark_url: Optional[str]
 
 def send_system_email(
     subject: str,
@@ -139,123 +162,38 @@ def build_html_shell(
     custom_content: str = "",
     badge: str = "",
     footer_note: str = "",
+    template_name: str = "emails/billing/base.html",
 ) -> str:
     """
     Constructs a responsive, branded HTML email template featuring the official
     Mail Flow logo and brand identity (Deep Obsidian canvas, Slate 900 card,
     Electric Cyan highlights, and Royal Blue CTAs).
     """
-    row_html = ""
-    if rows:
-        rendered_rows = []
-        rows_list = list(rows)
-        for index, (label, val) in enumerate(rows_list):
-            bg_style = "background-color:#0b0f17;" if index % 2 == 0 else "background-color:#0f172a;"
-            is_last = (index == len(rows_list) - 1)
-            border_bottom = "border-bottom:none;" if is_last else "border-bottom:1px solid #1e293b;"
-            val_str = str(val)
-            val_color = "#38bdf8" if "USDT" in val_str or "http" in val_str or "Active" in val_str or "Confirmed" in val_str else "#f1f5f9"
-            rendered_rows.append(
-                f"<tr style=\"{bg_style}\">"
-                f"<td style=\"padding:11px 16px;color:#64748b;font-size:13px;font-weight:500;width:38%;vertical-align:top;{border_bottom}word-break:break-word;\">{escape(str(label))}</td>"
-                f"<td style=\"padding:11px 16px;color:{val_color};font-size:13px;font-weight:600;vertical-align:top;{border_bottom}word-break:break-word;overflow-wrap:anywhere;\">{escape(val_str)}</td>"
-                "</tr>"
-            )
-        row_html = (
-            "<table role=\"presentation\" style=\"width:100%;max-width:100%;border-collapse:collapse;margin:18px 0;border:1px solid #1e293b;border-radius:8px;overflow:hidden;background-color:#0b0f17;\">"
-            f"{''.join(rendered_rows)}"
-            "</table>"
-        )
+    rows_list = list(rows or [])
+    rendered_rows: list[EmailRowContext] = []
+    for index, (label, value) in enumerate(rows_list):
+        value_text = str(value)
+        rendered_rows.append({
+            "label": str(label),
+            "value": value_text,
+            "dark": index % 2 == 0,
+            "last": index == len(rows_list) - 1,
+            "accent": any(token in value_text for token in ("USDT", "http", "Active", "Confirmed")),
+        })
+    context: EmailShellContext = {
+        "title": title,
+        "intro": intro,
+        "rows": rendered_rows,
+        "cta_url": cta_url,
+        "cta_label": cta_label,
+        "custom_content": mark_safe(custom_content),
+        "badge": badge,
+        "footer_note": footer_note or "This is an automated system notification from Mail Flow. Please do not reply directly to this email.",
+        "logo_url": LOGO_URL,
+        "mark_url": MARK_URL,
+    }
+    return render_to_string(template_name, context)
 
-    badge_html = ""
-    if badge:
-        badge_html = (
-            f"<div style=\"display:inline-block;background:rgba(0,102,255,0.12);color:#38bdf8;font-size:11px;font-weight:700;"
-            f"letter-spacing:0.06em;text-transform:uppercase;padding:4px 11px;border-radius:9999px;margin-bottom:14px;border:1px solid rgba(56,189,248,0.3);\">{escape(badge)}</div>"
-        )
-
-    cta_html = ""
-    if cta_url and cta_label:
-        cta_html = (
-            f"<table role=\"presentation\" style=\"margin:24px 0 16px;border-collapse:collapse;\">"
-            "<tr>"
-            "<td align=\"center\" style=\"border-radius:8px;background-color:#0066FF;\">"
-            f"<a href=\"{escape(cta_url)}\" target=\"_blank\" "
-            "style=\"background-color:#0066FF;color:#ffffff;text-decoration:none;padding:13px 26px;"
-            "border-radius:8px;display:inline-block;font-weight:600;font-size:14px;letter-spacing:0.01em;box-shadow:0 4px 14px rgba(0,102,255,0.35);\">"
-            f"&rarr; {escape(cta_label)}</a>"
-            "</td>"
-            "</tr>"
-            "</table>"
-        )
-
-    footer_text = footer_note or "This is an automated system notification from Mail Flow. Please do not reply directly to this email."
-
-    return (
-        "<!DOCTYPE html>"
-        "<html lang=\"en\">"
-        "<head>"
-        "<meta charset=\"UTF-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title>" + escape(title) + "</title>"
-        "</head>"
-        "<body style=\"margin:0;padding:0;background-color:#080C14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;\">"
-        "<table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#080C14;padding:36px 12px;\">"
-        "<tr>"
-        "<td align=\"center\">"
-        "<table role=\"presentation\" width=\"100%\" style=\"max-width:580px;background-color:#0F172A;border:1px solid #1E293B;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;border-collapse:separate;border-spacing:0;\">"
-        "<!-- Top Brand Gradient Accent Line -->"
-        "<tr>"
-        "<td height=\"3\" style=\"background:linear-gradient(90deg, #00D2FF 0%, #0066FF 50%, #2563EB 100%);background-color:#0066FF;line-height:3px;font-size:3px;\">&nbsp;</td>"
-        "</tr>"
-        "<!-- Header with Logo -->"
-        "<tr>"
-        "<td style=\"padding:26px 28px 20px;background-color:#0B0F17;border-bottom:1px solid #1E293B;\">"
-        "<table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">"
-        "<tr>"
-        "<td>"
-        f"<a href=\"https://mail-flow.annomous.com\" target=\"_blank\" style=\"text-decoration:none;display:inline-block;\">"
-        f"<img src=\"{LOGO_URL}\" alt=\"Mail Flow\" width=\"145\" height=\"auto\" style=\"display:block;max-width:145px;height:auto;border:0;\" />"
-        "</a>"
-        "</td>"
-        "</tr>"
-        "</table>"
-        "</td>"
-        "</tr>"
-        "<!-- Body Content -->"
-        "<tr>"
-        "<td style=\"padding:28px 28px 22px;background-color:#0F172A;\">"
-        f"{badge_html}"
-        f"<h1 style=\"font-size:20px;font-weight:700;margin:0 0 12px;color:#F8FAFC;line-height:1.35;\">{escape(title)}</h1>"
-        f"<p style=\"font-size:14px;line-height:1.6;color:#94A3B8;margin:0 0 16px;\">{escape(intro)}</p>"
-        f"{custom_content}"
-        f"{row_html}"
-        f"{cta_html}"
-        "</td>"
-        "</tr>"
-        "<!-- Footer -->"
-        "<tr>"
-        "<td style=\"background-color:#080C14;padding:20px 28px;border-top:1px solid #1E293B;\">"
-        "<table role=\"presentation\" width=\"100%\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\">"
-        "<tr>"
-        "<td style=\"vertical-align:middle;padding-right:12px;width:32px;\">"
-        f"<img src=\"{MARK_URL}\" alt=\"\" width=\"24\" height=\"24\" style=\"display:block;border:0;border-radius:4px;opacity:0.95;\" />"
-        "</td>"
-        "<td style=\"vertical-align:middle;\">"
-        f"<p style=\"margin:0;font-size:12px;color:#64748B;line-height:1.5;\">{escape(footer_text)}</p>"
-        "<p style=\"margin:4px 0 0;font-size:11px;color:#475569;\">&copy; Mail Flow. All rights reserved.</p>"
-        "</td>"
-        "</tr>"
-        "</table>"
-        "</td>"
-        "</tr>"
-        "</table>"
-        "</td>"
-        "</tr>"
-        "</table>"
-        "</body>"
-        "</html>"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +221,7 @@ def deliver_checkout_otp_email(email: str, code: str) -> None:
         custom_content=custom_content,
         badge="Security Verification",
         footer_note="Never share your verification code with anyone. Mail Flow staff will never ask for this code.",
+        template_name="emails/billing/checkout_otp.html",
     )
     send_system_email(subject, body, email, html, sender="billing")
 
@@ -361,6 +300,7 @@ def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) ->
         custom_content=custom_content,
         badge=badge_label,
         footer_note=footer_note,
+        template_name="emails/billing/invoice_recovery.html" if recovery else "emails/billing/invoice_created.html",
     )
     send_system_email(f"{purpose} - Mail Flow", body, invoice.customer_email, html, sender="billing")
     invoice.access_codes.filter(encrypted_delivery_copy__gt="").update(
@@ -410,6 +350,7 @@ def deliver_payment_confirmation_email(invoice: PaymentInvoice) -> None:
         "Access Your Dashboard",
         badge="Payment Verified",
         footer_note="Your subscription plan has been activated. Thank you for using Mail Flow.",
+        template_name="emails/billing/payment_confirmation.html",
     )
     send_system_email("Payment confirmed - Mail Flow", body, invoice.customer_email, html, sender="billing")
 
@@ -433,6 +374,7 @@ def deliver_manual_review_email(invoice: PaymentInvoice) -> None:
         rows,
         badge="Manual Review",
         footer_note="Our billing team is reviewing your transfer and will update your account shortly.",
+        template_name="emails/billing/manual_review.html",
     )
     send_system_email("Payment under manual review - Mail Flow", body, invoice.customer_email, html, sender="billing")
 
@@ -499,6 +441,7 @@ def deliver_account_created_email(user: Any) -> None:
         "Sign In to Mail Flow",
         badge="Account Created",
         footer_note="Use the password configured during onboarding or provided by your organization administrator.",
+        template_name="emails/billing/account_created.html",
     )
     send_system_email("Your Mail Flow account is ready", body, user.email, html, sender="general")
 
@@ -539,6 +482,7 @@ def deliver_renewal_reminder_email(delivery: Any, admin_name: Optional[str] = No
         "Manage Subscription",
         badge="Renewal Reminder",
         footer_note="To ensure uninterrupted service, please make sure your payment details or invoice renewals are up to date.",
+        template_name="emails/billing/renewal_reminder.html",
     )
 
     send_system_email(subject, body, delivery.recipient_email, html=html, sender="billing")

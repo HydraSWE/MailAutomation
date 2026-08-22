@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearTokens } from "../utils/auth";
+import { clearTokens, getActiveOrganization, getUser } from "../utils/auth";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -47,6 +47,12 @@ const processQueue = (error, token = null) => {
 apiClient.interceptors.request.use(
   async (config) => {
     delete config.headers.Authorization;
+    const activeOrganization = getActiveOrganization();
+    if (getUser().role === "owner" && activeOrganization?.id) {
+      config.headers["X-Organization-ID"] = String(activeOrganization.id);
+    } else {
+      delete config.headers["X-Organization-ID"];
+    }
     const method = (config.method || "get").toLowerCase();
     if (!["get", "head", "options", "trace"].includes(method) && typeof document !== "undefined") {
       const csrf = await getCsrfToken();

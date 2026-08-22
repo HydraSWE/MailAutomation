@@ -1,12 +1,14 @@
 function getTokenValue(key) {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(key);
+  return window.localStorage.getItem(key);
 }
+
+const ACTIVE_ORGANIZATION_KEY = "active_organization";
 
 if (typeof window !== "undefined") {
   // Remove JWTs left by releases that stored credentials in JavaScript-accessible storage.
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  window.localStorage.removeItem("access_token");
+  window.localStorage.removeItem("refresh_token");
 }
 
 export function getAccessToken() {
@@ -19,14 +21,37 @@ export function getRefreshToken() {
 
 export function setTokens(access, refresh) {
   // JWTs are stored only in HttpOnly cookies by the backend.
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  window.localStorage.removeItem("access_token");
+  window.localStorage.removeItem("refresh_token");
 }
 
 export function clearTokens() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("user_info");
+  window.localStorage.removeItem("access_token");
+  window.localStorage.removeItem("refresh_token");
+  window.localStorage.removeItem("user_info");
+  window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
+}
+
+export function getActiveOrganization() {
+  const stored = window.localStorage.getItem(ACTIVE_ORGANIZATION_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (_error) {
+    window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
+    return null;
+  }
+}
+
+export function setActiveOrganization(organization) {
+  if (organization?.id) {
+    window.localStorage.setItem(ACTIVE_ORGANIZATION_KEY, JSON.stringify({
+      id: organization.id,
+      name: organization.name,
+    }));
+  } else {
+    window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
+  }
 }
 
 export function decodeJwt(token) {
@@ -54,7 +79,7 @@ export function isAuthenticated() {
 }
 
 export function getUser() {
-  const stored = localStorage.getItem("user_info");
+  const stored = window.localStorage.getItem("user_info");
   if (stored) {
     try {
       return JSON.parse(stored);
@@ -76,5 +101,6 @@ export function getUser() {
 }
 
 export function setUser(userInfo) {
-  localStorage.setItem("user_info", JSON.stringify(userInfo));
+  window.localStorage.setItem("user_info", JSON.stringify(userInfo));
+  if (userInfo?.role !== "owner") window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
 }

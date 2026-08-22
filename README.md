@@ -5,6 +5,41 @@
 
 A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST Framework**, **PostgreSQL**, **Celery + Redis**, and **React (Vite)**. It ships with a full billing system that accepts on-chain **USDT** payments across four blockchains, a five-tier RBAC model, per-organization quota enforcement, click/unsubscribe tracking, a support-ticket desk, and a real-time platform administration console.
 
+### Modular architecture
+
+- Billing services and views expose compatibility facades from
+  `billing.services` and `billing.views`, with focused domain import modules
+  underneath them.
+- User authentication cookies live in `users.auth_cookies`; `users.views`
+  remains a stable facade for existing URL configuration.
+- Large frontend routes are thin page shells over settings, email-builder,
+  campaign-wizard, and recipient-import workspaces.
+- The stylesheet entry point defines stable cascade layers while legacy
+  selectors are migrated incrementally with visual coverage.
+
+Verification commands:
+
+```bash
+cd backend && ../.venv/Scripts/python manage.py check
+cd backend && ../.venv/Scripts/python manage.py makemigrations --check --dry-run
+cd backend && ../.venv/Scripts/python manage.py test billing.tests users.tests --settings=config.test_settings
+cd frontend && npm test && npm run test:visual -- --workers=1 && npm run build
+python generate_email_previews.py
+php -l deploy/php/mailflow-otp-relay.php
+php -l deploy/php/mailflow-smtp-test-relay.php
+php -l deploy/php/mailflow-campaign-relay.php
+```
+
+Visual baselines live beside `frontend/tests/visual/workflows.spec.js` and cover
+settings, platform organizations/users, the template builder, campaign wizard,
+and recipient import at mobile, tablet, and desktop widths. Regenerate them only
+after reviewing an intentional UI change with `npm run test:visual:update`.
+
+Billing HTML is sourced only from `backend/templates/emails/billing`. The root
+preview command boots Django and renders deterministic sample contexts through
+the same production context builders; generated preview HTML and its gallery are
+build artifacts rather than editable email sources.
+
 ---
 
 ## Table of Contents

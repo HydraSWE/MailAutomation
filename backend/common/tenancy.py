@@ -10,7 +10,8 @@ def request_organization(request, *, required=True):
     user = request.user
     organization = getattr(user, "organization", None)
     if is_owner(user):
-        requested_id = request.data.get("organization") if hasattr(request, "data") else None
+        requested_id = request.headers.get("X-Organization-ID")
+        requested_id = requested_id or (request.data.get("organization") if hasattr(request, "data") else None)
         requested_id = requested_id or request.query_params.get("organization")
         if requested_id:
             from common.models import Organization
@@ -46,7 +47,12 @@ class TenantViewSetMixin:
     request: Any
 
     def get_queryset(self):
-        return scope_queryset(super().get_queryset(), self.request.user, self.organization_field)  # pyright: ignore[reportAttributeAccessIssue]
+        queryset = super().get_queryset()
+        if is_owner(self.request.user):
+            organization = request_organization(self.request, required=False)
+            if organization is not None:
+                return queryset.filter(**{f"{self.organization_field}_id": organization.pk})
+        return scope_queryset(queryset, self.request.user, self.organization_field)
 
     def perform_create(self, serializer):
         organization = request_organization(self.request)

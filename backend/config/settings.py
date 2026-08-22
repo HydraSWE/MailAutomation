@@ -154,6 +154,8 @@ CORS_ALLOWED_ORIGINS = [x.strip() for x in os.getenv("CORS_ALLOWED_ORIGINS", "ht
 if IS_PRODUCTION and any(origin == "*" for origin in CORS_ALLOWED_ORIGINS):
     raise ImproperlyConfigured("Wildcard CORS origins are not allowed in production.")
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = (*default_headers, "x-organization-id")
 
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL

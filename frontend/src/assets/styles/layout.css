@@ -1,0 +1,100 @@
+/* App Shell Layout Structure */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #090d16;
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 750;
+  font-size: 19px;
+  margin: 0 8px 28px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #9ca3af;
+  text-decoration: none;
+  padding: 11px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  background: #1e293b;
+  color: #fff;
+}
+
+.main {
+  min-width: 0;
+  background-color: #090d16;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.navbar {
+  height: 64px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+@media (min-width: 640px) {
+  .navbar {
+    padding: 0 28px;
+  }
+}
+
+.content {
+  padding: 16px;
+  min-width: 0;
+  flex: 1;
+}
+
+@media (min-width: 640px) {
+  .content {
+    padding: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .content {
+    padding: 32px;
+  }
+}
+

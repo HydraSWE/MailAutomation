@@ -5,6 +5,7 @@ import { clearTokens, isAuthenticated, getUser } from "../utils/auth";
 import api from "../services/api";
 import NotificationBell from "./notifications/NotificationBell";
 import BrandLogo from "./BrandLogo";
+import ActiveOrganizationSwitcher from "./ActiveOrganizationSwitcher";
 
 export default function Navbar({ onToggleMobileMenu }) {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ export default function Navbar({ onToggleMobileMenu }) {
       </div>
 
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        {auth && user.role === "owner" && <ActiveOrganizationSwitcher />}
         {auth && <NotificationBell />}
 
         <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-800/60 border border-slate-700/50 rounded-full text-xs text-slate-300">

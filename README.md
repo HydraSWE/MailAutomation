@@ -565,4 +565,4 @@ The platform includes an automated backup system:
 
 ## License
 
-Mail Flow {mail-flow.annomous.com}. All rights reserved.
+Mail Flow. All rights reserved.

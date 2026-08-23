@@ -47,19 +47,26 @@ def preview_count(attrs: dict[str, Any], instance: PlatformBroadcast | None = No
 
 
 def render_broadcast_html(subject: str, body: str) -> str:
-    paragraphs = "".join(
-        f"<p style=\"font-size:15px;line-height:1.6;color:#34424f;margin:0 0 14px\">{escape(part)}</p>"
-        for part in body.splitlines()
-        if part.strip()
+    from billing.emails import build_html_shell
+
+    lines = [part.strip() for part in body.splitlines() if part.strip()]
+    intro = lines[0] if lines else "A platform update is available."
+    remaining = lines[1:] if len(lines) > 1 else []
+
+    custom_content = ""
+    if remaining:
+        paragraphs_html = "".join(
+            f'<p style="font-size:14px;line-height:1.6;color:#94A3B8;margin:0 0 14px;">{escape(p)}</p>'
+            for p in remaining
+        )
+        custom_content = f'<div style="margin-top:12px;">{paragraphs_html}</div>'
+
+    return build_html_shell(
+        title=subject,
+        intro=intro,
+        custom_content=custom_content,
+        badge="Platform Announcement",
+        footer_note="You received this platform announcement as a registered user of Mail Flow.",
+        template_name="emails/billing/base.html",
     )
-    if not paragraphs:
-        paragraphs = "<p style=\"font-size:15px;line-height:1.6;color:#34424f;margin:0\">Mail Flow update.</p>"
-    return (
-        "<div style=\"font-family:Arial,sans-serif;background:#f6f8fb;padding:28px\">"
-        "<div style=\"max-width:620px;margin:0 auto;background:#fff;border:1px solid #dde4ec;"
-        "border-radius:8px;padding:28px\">"
-        f"<h1 style=\"font-size:22px;margin:0 0 16px;color:#17212b\">{escape(subject)}</h1>"
-        f"{paragraphs}"
-        "<p style=\"font-size:13px;color:#6b7785;line-height:1.5;margin-top:24px\">Mail Flow</p>"
-        "</div></div>"
-    )
+

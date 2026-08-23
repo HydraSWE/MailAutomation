@@ -62,20 +62,20 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: "/dashboard", element: <ProtectedRoute element={<Dashboard />} /> },
-      { path: "/templates", element: <ProtectedRoute element={<Templates />} /> },
+      { path: "/templates", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<Templates />} /> },
 
-      { path: "/recipients", element: <ProtectedRoute element={<RecipientsPage />} /> },
-      { path: "/recipients/lists", element: <ProtectedRoute element={<RecipientListsPage />} /> },
-      { path: "/recipients/import", element: <ProtectedRoute roles={["owner", "admin", "manager"]} element={<ImportRecipientsPage />} /> },
+      { path: "/recipients", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<RecipientsPage />} /> },
+      { path: "/recipients/lists", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<RecipientListsPage />} /> },
+      { path: "/recipients/import", element: <ProtectedRoute roles={["admin", "manager"]} element={<ImportRecipientsPage />} /> },
 
-      { path: "/campaigns", element: <ProtectedRoute element={<CampaignsPage />} /> },
-      { path: "/campaigns/new", element: <ProtectedRoute roles={["owner", "admin", "manager"]} element={<CreateCampaignPage />} /> },
-      { path: "/campaigns/:campaignId", element: <ProtectedRoute element={<CampaignDetailsPage />} /> },
+      { path: "/campaigns", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<CampaignsPage />} /> },
+      { path: "/campaigns/new", element: <ProtectedRoute roles={["admin", "manager"]} element={<CreateCampaignPage />} /> },
+      { path: "/campaigns/:campaignId", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<CampaignDetailsPage />} /> },
 
       { path: "/smtp", element: <ProtectedRoute element={<SMTPPage />} /> },
 
-      { path: "/reports", element: <ProtectedRoute element={<ReportsPage />} /> },
-      { path: "/reports/campaigns/:campaignId", element: <ProtectedRoute element={<CampaignReportPage />} /> },
+      { path: "/reports", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<ReportsPage />} /> },
+      { path: "/reports/campaigns/:campaignId", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<CampaignReportPage />} /> },
 
       { path: "/support", element: <ProtectedRoute element={<HelpSupport />} /> },
       { path: "/mail-workspace", element: <ProtectedRoute roles={["owner", "admin"]} element={<MailWorkspace />} /> },

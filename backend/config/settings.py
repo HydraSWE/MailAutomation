@@ -154,8 +154,6 @@ CORS_ALLOWED_ORIGINS = [x.strip() for x in os.getenv("CORS_ALLOWED_ORIGINS", "ht
 if IS_PRODUCTION and any(origin == "*" for origin in CORS_ALLOWED_ORIGINS):
     raise ImproperlyConfigured("Wildcard CORS origins are not allowed in production.")
 CORS_ALLOW_CREDENTIALS = True
-from corsheaders.defaults import default_headers
-CORS_ALLOW_HEADERS = (*default_headers, "x-organization-id")
 
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
@@ -218,6 +216,12 @@ MAIL_FLOW_SMTP_TEST_RELAY_TIMEOUT = float(os.getenv("MAIL_FLOW_SMTP_TEST_RELAY_T
 MAIL_FLOW_CAMPAIGN_RELAY_URL = os.getenv("MAIL_FLOW_CAMPAIGN_RELAY_URL", "")
 MAIL_FLOW_CAMPAIGN_RELAY_SECRET = os.getenv("MAIL_FLOW_CAMPAIGN_RELAY_SECRET", "")
 MAIL_FLOW_CAMPAIGN_RELAY_TIMEOUT = float(os.getenv("MAIL_FLOW_CAMPAIGN_RELAY_TIMEOUT", "30"))
+MAIL_FLOW_IMAP_SYNC_RELAY_URL = os.getenv("MAIL_FLOW_IMAP_SYNC_RELAY_URL", "")
+MAIL_FLOW_IMAP_SYNC_RELAY_SECRET = os.getenv(
+    "MAIL_FLOW_IMAP_SYNC_RELAY_SECRET",
+    os.getenv("MAIL_FLOW_SMTP_TEST_RELAY_SECRET", os.getenv("MAIL_FLOW_OTP_RELAY_SECRET", "")),
+)
+MAIL_FLOW_IMAP_SYNC_RELAY_TIMEOUT = float(os.getenv("MAIL_FLOW_IMAP_SYNC_RELAY_TIMEOUT", "30"))
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 TRACKING_BASE_URL = os.getenv("TRACKING_BASE_URL", "http://localhost:8000")
 if IS_PRODUCTION and not os.getenv("TRACKING_BASE_URL"):

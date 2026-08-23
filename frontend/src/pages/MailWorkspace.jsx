@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Inbox, MailPlus, RefreshCw, Send, Settings2 } from "lucide-react";
+import { Edit2, Inbox, MailPlus, Network, RefreshCw, Send, Settings2, Trash } from "lucide-react";
 import supportApi from "../services/supportApi";
 import CustomSelect from "../components/common/CustomSelect";
 import { apiError } from "../utils/apiError";
@@ -37,6 +37,7 @@ export default function MailWorkspace() {
   const [reply, setReply] = useState("");
   const [mailboxId, setMailboxId] = useState("");
   const [mailboxForm, setMailboxForm] = useState(emptyMailbox);
+  const [editingMailbox, setEditingMailbox] = useState(null);
   const [showMailboxForm, setShowMailboxForm] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -146,14 +147,92 @@ export default function MailWorkspace() {
     setMessage("");
     try {
       const payload = { ...mailboxForm };
+      if (editingMailbox && payload.imap_password === "********") delete payload.imap_password;
       if (!payload.smtp_password) delete payload.smtp_password;
-      await supportApi.createMailbox(payload);
+      if (editingMailbox) {
+        await supportApi.updateMailbox(editingMailbox.id, payload);
+      } else {
+        await supportApi.createMailbox(payload);
+      }
       setMailboxForm(emptyMailbox);
+      setEditingMailbox(null);
       setShowMailboxForm(false);
-      setMessage("Mailbox added to the workspace.");
+      setMessage(editingMailbox ? "Mailbox updated." : "Mailbox added to the workspace.");
       await load();
     } catch (requestError) {
       setError(apiError(requestError, "Unable to save mailbox."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startAddMailbox() {
+    setEditingMailbox(null);
+    setMailboxForm(emptyMailbox);
+    setShowMailboxForm((value) => !value);
+  }
+
+  function startEditMailbox(mailbox) {
+    setEditingMailbox(mailbox);
+    setMailboxForm({
+      name: mailbox.name || "",
+      email: mailbox.email || "",
+      imap_host: mailbox.imap_host || "",
+      imap_port: mailbox.imap_port || 993,
+      imap_encryption: mailbox.imap_encryption || "ssl",
+      imap_username: mailbox.imap_username || "",
+      imap_password: "********",
+      smtp_host: mailbox.smtp_host || "",
+      smtp_port: mailbox.smtp_port || 465,
+      smtp_encryption: mailbox.smtp_encryption || "ssl",
+      smtp_username: mailbox.smtp_username || "",
+      smtp_password: "",
+      from_name: mailbox.from_name || "",
+      is_active: mailbox.is_active !== false,
+    });
+    setShowMailboxForm(true);
+  }
+
+  async function deleteMailbox(mailbox) {
+    if (!window.confirm(`Delete inbox "${mailbox.name}"? Existing tickets will remain, but this inbox can no longer sync or send replies.`)) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await supportApi.deleteMailbox(mailbox.id);
+      setMessage("Mailbox deleted.");
+      if (String(mailbox.id) === mailboxId) setMailboxId("");
+      await load();
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "Unable to delete mailbox.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testMailboxImap(id) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await supportApi.testMailboxImap(id);
+      setMessage(response.data?.message || "IMAP connection successful.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "IMAP connection failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testMailboxSmtp(id) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await supportApi.testMailboxSmtp(id);
+      setMessage(response.data?.message || "SMTP test email sent.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "SMTP test failed.");
     } finally {
       setBusy(false);
     }
@@ -182,7 +261,7 @@ export default function MailWorkspace() {
           <p className="mt-1 text-sm text-slate-400">{access?.role === "owner" ? "Manage Help & Support requests and reply from platform support inboxes." : "Read mail and reply from this organization's connected inboxes."}</p>
         </div>
         <button
-          onClick={() => setShowMailboxForm((value) => !value)}
+          onClick={startAddMailbox}
           disabled={access?.mail_connection_usage && access.mail_connection_usage.used >= access.mail_connection_usage.limit}
           className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold disabled:opacity-60"
           title={access?.mail_connection_usage ? `${access.mail_connection_usage.used}/${access.mail_connection_usage.limit} SMTP + inbox connections used` : "Add mailbox"}
@@ -195,14 +274,14 @@ export default function MailWorkspace() {
       {error && <Notice error>{error}</Notice>}
       {access?.mail_connection_usage && (
         <Notice>
-          Mail connections used: {access.mail_connection_usage.used}/{access.mail_connection_usage.limit} SMTP + inboxes.
+          Mail connections used: {access.mail_connection_usage.used}/{access.mail_connection_usage.limit} campaign SMTP + workspace inboxes.
         </Notice>
       )}
 
       {showMailboxForm && (
         <form onSubmit={saveMailbox} className="rounded-md border border-slate-800 bg-slate-900/60 p-5">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-200">
-            <Settings2 className="h-4 w-4 text-indigo-300" /> Mailbox details
+            <Settings2 className="h-4 w-4 text-indigo-300" /> {editingMailbox ? "Edit inbox" : "Mailbox details"}
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {[
@@ -213,26 +292,42 @@ export default function MailWorkspace() {
               ["imap_port", "IMAP port", "number"],
               ["imap_username", "IMAP username"],
               ["imap_password", "IMAP password", "password"],
+              ["imap_encryption", "IMAP encryption"],
               ["smtp_host", "SMTP host"],
               ["smtp_port", "SMTP port", "number"],
               ["smtp_username", "SMTP username"],
               ["smtp_password", "SMTP password", "password"],
+              ["smtp_encryption", "SMTP encryption"],
             ].map(([key, label, type = "text"]) => (
               <label key={key} className="text-xs font-semibold text-slate-400">
                 {label}
-                <input
-                  type={type}
-                  required={!["smtp_password"].includes(key)}
-                  value={mailboxForm[key]}
-                  onChange={(event) => setMailboxForm({ ...mailboxForm, [key]: type === "number" ? Number(event.target.value) : event.target.value })}
-                  className="mt-2 w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                />
+                {["imap_encryption", "smtp_encryption"].includes(key) ? (
+                  <CustomSelect
+                    value={mailboxForm[key]}
+                    onChange={(value) => setMailboxForm({ ...mailboxForm, [key]: value })}
+                    options={[
+                      { value: "ssl", label: "SSL / TLS" },
+                      { value: "tls", label: "STARTTLS" },
+                      { value: "none", label: "None" },
+                    ]}
+                    ariaLabel={label}
+                    className="mt-2"
+                  />
+                ) : (
+                  <input
+                    type={type}
+                    required={!["smtp_password"].includes(key) && !(editingMailbox && key === "imap_password")}
+                    value={mailboxForm[key]}
+                    onChange={(event) => setMailboxForm({ ...mailboxForm, [key]: type === "number" ? Number(event.target.value) : event.target.value })}
+                    className="mt-2 w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
+                  />
+                )}
               </label>
             ))}
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={() => setShowMailboxForm(false)} className="rounded-md border border-slate-700 px-4 py-2 text-sm">Cancel</button>
-            <button disabled={busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-60">Save mailbox</button>
+            <button type="button" onClick={() => { setShowMailboxForm(false); setEditingMailbox(null); }} className="rounded-md border border-slate-700 px-4 py-2 text-sm">Cancel</button>
+            <button disabled={busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-60">{editingMailbox ? "Update mailbox" : "Save mailbox"}</button>
           </div>
         </form>
       )}
@@ -331,9 +426,23 @@ export default function MailWorkspace() {
                   <p className="mt-1 text-[11px] text-slate-500">{mailbox.last_synced_at ? `Synced ${new Date(mailbox.last_synced_at).toLocaleString()}` : "Not synced yet"}</p>
                 </button>
                 {mailbox.last_error && <p className="mt-2 text-xs text-rose-300">{mailbox.last_error}</p>}
-                <button disabled={busy} onClick={() => syncMailbox(mailbox.id)} className="mx-2 mb-2 mt-1 inline-flex items-center gap-2 rounded-md border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60">
-                  <RefreshCw className="h-3.5 w-3.5" /> Sync
-                </button>
+                <div className="mx-2 mb-2 mt-1 flex flex-wrap gap-1.5">
+                  <button disabled={busy} onClick={() => syncMailbox(mailbox.id)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60" title="Sync inbox">
+                    <RefreshCw className="h-3.5 w-3.5" /> Sync
+                  </button>
+                  <button disabled={busy} onClick={() => testMailboxImap(mailbox.id)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60" title="Test IMAP">
+                    <Network className="h-3.5 w-3.5" /> IMAP
+                  </button>
+                  <button disabled={busy} onClick={() => testMailboxSmtp(mailbox.id)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60" title="Test SMTP reply">
+                    <Send className="h-3.5 w-3.5" /> SMTP
+                  </button>
+                  <button disabled={busy} onClick={() => startEditMailbox(mailbox)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-60" title="Edit inbox">
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button disabled={busy} onClick={() => deleteMailbox(mailbox)} className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 px-2.5 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/10 disabled:opacity-60" title="Delete inbox">
+                    <Trash className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
             {mailboxes.length === 0 && <p className="p-5 text-sm text-slate-500">No mailboxes connected.</p>}

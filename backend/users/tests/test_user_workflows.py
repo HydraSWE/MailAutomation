@@ -40,6 +40,21 @@ class UserWorkflowTests(TestCase):
         session.refresh_from_db()
         self.assertIsNotNone(session.revoked_at)
 
+    def test_new_login_revokes_previous_sessions_for_admin(self):
+        previous = UserLoginSession.objects.create(user=self.admin, session_id=uuid4())
+        client = APIClient()
+
+        response = client.post(
+            "/api/auth/token/",
+            {"username": self.admin.username, "password": "ValidPass123!"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        previous.refresh_from_db()
+        self.assertIsNotNone(previous.revoked_at)
+        self.assertEqual(UserLoginSession.objects.filter(user=self.admin, revoked_at__isnull=True).count(), 1)
+
     def test_2fa_disable_rejects_incorrect_password(self):
         self.admin.two_factor_enabled = True
         self.admin.two_factor_secret = "secret"

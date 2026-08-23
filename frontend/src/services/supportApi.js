@@ -12,6 +12,8 @@ export const supportApi = {
   updateMailbox: (id, data) => api.patch(`/support/mailboxes/${id}/`, data),
   deleteMailbox: (id) => api.delete(`/support/mailboxes/${id}/`),
   syncMailbox: (id) => api.post(`/support/mailboxes/${id}/sync/`),
+  testMailboxImap: (id) => api.post(`/support/mailboxes/${id}/test-imap/`),
+  testMailboxSmtp: (id, data = {}) => api.post(`/support/mailboxes/${id}/test-smtp/`, data),
   workspaceAccess: () => api.get("/support/workspace-access/"),
 };
 

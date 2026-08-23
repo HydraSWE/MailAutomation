@@ -62,8 +62,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             }
 
         # ── Normal login (no 2FA) ─────────────────────────────────────
-        if user.role == User.Role.OWNER:
-            UserLoginSession.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+        UserLoginSession.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
         session_id = uuid.uuid4()
         refresh = RefreshToken(cast(Any, data["refresh"]))
         refresh["session_id"] = str(session_id)

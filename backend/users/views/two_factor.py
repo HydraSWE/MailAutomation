@@ -146,8 +146,7 @@ class TwoFactorVerifyLoginView(APIView):
             )
 
         # Issue full JWT tokens and create session
-        if user.role == User.Role.OWNER:
-            UserLoginSession.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+        UserLoginSession.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
         session_id = uuid.uuid4()
         refresh = RefreshToken.for_user(user)
         refresh["session_id"] = str(session_id)

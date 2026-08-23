@@ -211,9 +211,9 @@ export default function SMTPPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-100">SMTP Management</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100">Campaign SMTP</h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Configure email delivery servers, manage sending quotas, and test socket connectivity.
+            Configure campaign delivery servers. Workspace inboxes are managed separately in Mail Workspace.
           </p>
         </div>
 
@@ -277,7 +277,7 @@ export default function SMTPPage() {
         data={servers}
         loading={loading}
         emptyTitle="No SMTP Servers Configured"
-        emptyDescription="Add an SMTP server to begin sending email campaigns."
+        emptyDescription="Add a campaign SMTP server to begin sending email campaigns."
       />
 
       {/* Modals */}

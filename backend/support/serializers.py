@@ -73,6 +73,7 @@ class SupportMailboxSerializer(serializers.ModelSerializer):
     smtp_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     organization_name = serializers.CharField(source="organization.name", read_only=True, allow_null=True)
     password_configured = serializers.SerializerMethodField()
+    smtp_password_configured = serializers.SerializerMethodField()
     last_error = serializers.SerializerMethodField()
 
     class Meta:
@@ -82,9 +83,9 @@ class SupportMailboxSerializer(serializers.ModelSerializer):
             "imap_host", "imap_port", "imap_encryption", "imap_username", "imap_password",
             "smtp_host", "smtp_port", "smtp_encryption", "smtp_username", "smtp_password",
             "from_name", "is_active", "last_synced_at", "last_error",
-            "password_configured", "created_at", "updated_at",
+            "password_configured", "smtp_password_configured", "created_at", "updated_at",
         )
-        read_only_fields = ("last_synced_at", "last_error", "password_configured", "created_at", "updated_at")
+        read_only_fields = ("last_synced_at", "last_error", "password_configured", "smtp_password_configured", "created_at", "updated_at")
         extra_kwargs = {
             # Tenant assignment is resolved from the authenticated user below.
             # Owners are the only callers allowed to choose it explicitly.
@@ -96,6 +97,9 @@ class SupportMailboxSerializer(serializers.ModelSerializer):
 
     def get_password_configured(self, obj):
         return bool(obj.encrypted_imap_password)
+
+    def get_smtp_password_configured(self, obj):
+        return bool(obj.encrypted_smtp_password)
 
     def get_last_error(self, obj):
         if not obj.last_error:

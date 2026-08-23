@@ -16,10 +16,12 @@ class SMTPAccountSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance is None:
-            organization = request_organization(self.context["request"])
-            usage = organization_mailbox_usage(organization)
-            if usage["used"] >= usage["limit"]:
-                raise serializers.ValidationError({"detail": "SMTP account limit reached for this account."})
+            user = self.context["request"].user
+            organization = None if user.role == "owner" else request_organization(self.context["request"])
+            if organization is not None:
+                usage = organization_mailbox_usage(organization)
+                if usage["used"] >= usage["limit"]:
+                    raise serializers.ValidationError({"detail": "SMTP account limit reached for this account."})
             if not attrs.get("password"):
                 raise serializers.ValidationError({"password": "Password is required."})
         return attrs
@@ -27,15 +29,17 @@ class SMTPAccountSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop("password")
-        organization = Organization.objects.select_for_update().get(pk=validated_data["organization"].pk)
-        usage = organization_mailbox_usage(organization)
-        if usage["used"] >= usage["limit"]:
-            raise serializers.ValidationError({
-                "detail": "SMTP account limit reached for this account.",
-                "limit": usage["limit"],
-                "used": usage["used"],
-            })
-        validated_data["organization"] = organization
+        organization = validated_data.get("organization")
+        if organization is not None:
+            organization = Organization.objects.select_for_update().get(pk=organization.pk)
+            usage = organization_mailbox_usage(organization)
+            if usage["used"] >= usage["limit"]:
+                raise serializers.ValidationError({
+                    "detail": "SMTP account limit reached for this account.",
+                    "limit": usage["limit"],
+                    "used": usage["used"],
+                })
+            validated_data["organization"] = organization
         obj = SMTPAccount(**validated_data)
         obj.set_password(password)
         obj.save()

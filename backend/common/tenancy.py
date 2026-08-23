@@ -10,8 +10,7 @@ def request_organization(request, *, required=True):
     user = request.user
     organization = getattr(user, "organization", None)
     if is_owner(user):
-        requested_id = request.headers.get("X-Organization-ID")
-        requested_id = requested_id or (request.data.get("organization") if hasattr(request, "data") else None)
+        requested_id = request.data.get("organization") if hasattr(request, "data") else None
         requested_id = requested_id or request.query_params.get("organization")
         if requested_id:
             from common.models import Organization

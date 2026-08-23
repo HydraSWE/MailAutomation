@@ -18,6 +18,7 @@ export default function SMTPTestModal({
   const [recipientEmail, setRecipientEmail] = useState("");
   const [testSubject, setTestSubject] = useState("Mail Flow SMTP Connection Test");
   const [testMessage, setTestMessage] = useState("This is a test email sent from Mail Flow.");
+  const [recipientError, setRecipientError] = useState("");
 
   const handleRunConnectionTest = async () => {
     if (!server?.id) return;
@@ -54,10 +55,11 @@ export default function SMTPTestModal({
   const handleSendTestEmail = async (e) => {
     e.preventDefault();
     if (!recipientEmail.trim()) {
-      toast.warning("Please enter recipient email.");
+      setRecipientError("Please enter recipient email.");
       return;
     }
 
+    setRecipientError("");
     setTesting(true);
     setTestResult(null);
 
@@ -179,10 +181,17 @@ export default function SMTPTestModal({
             <input
               type="email"
               value={recipientEmail}
-              onChange={(e) => setRecipientEmail(e.target.value)}
+              onChange={(e) => {
+                setRecipientEmail(e.target.value);
+                if (recipientError) setRecipientError("");
+              }}
               placeholder="your.email@example.com"
-              className="w-full bg-slate-900 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500"
+              aria-invalid={Boolean(recipientError)}
+              className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2 text-sm text-slate-100 focus:border-indigo-500 ${
+                recipientError ? "border-amber-500/70" : "border-slate-700/70"
+              }`}
             />
+            {recipientError && <p className="mt-1.5 text-xs font-semibold text-amber-300">{recipientError}</p>}
           </div>
 
           <div>
@@ -220,7 +229,7 @@ export default function SMTPTestModal({
               <p>Response: {testResult.message}</p>
               {testResult.stage && <p>Stage: {testResult.stage}</p>}
               {testResult.smtpCode && <p>SMTP code: {testResult.smtpCode}</p>}
-              <p className="opacity-75">Timestamp: {new Date(testResult.timestamp).toLocaleString()}</p>
+              {testResult.timestamp && <p className="opacity-75">Timestamp: {new Date(testResult.timestamp).toLocaleString()}</p>}
             </div>
           )}
 

@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
 from django.db.models import Q
 from django.conf import settings
 
@@ -15,7 +16,7 @@ from .serializers import (
     SupportReplySerializer,
     SupportTicketSerializer,
 )
-from .services import send_support_reply, sync_mailbox
+from .services import send_support_reply, send_via_mailbox, sync_mailbox, test_imap_via_relay
 
 
 def workspace_allowed(user):
@@ -120,7 +121,10 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
             expected_organization_id = None if request.user.role == "owner" else request.user.organization_id
             if mailbox.organization_id != expected_organization_id:
                 return Response({"detail": "Mailbox is not available for this workspace."}, status=403)
-        message = send_support_reply(ticket, serializer.validated_data["body"], actor=request.user, mailbox=mailbox)
+        try:
+            message = send_support_reply(ticket, serializer.validated_data["body"], actor=request.user, mailbox=mailbox)
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=400)
         return Response(SupportTicketSerializer(message.ticket).data)
 
     @action(detail=True, methods=["post"], url_path="set-status")
@@ -160,10 +164,30 @@ class SupportMailboxViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Mail workspace is not enabled."}, status=403)
         return super().update(request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        if not workspace_allowed(request.user):
+            return Response({"detail": "Mail workspace is not enabled."}, status=403)
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=["post"])
     def sync(self, request, pk=None):
         mailbox = self.get_object()
         try:
             return Response(sync_mailbox(mailbox))
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=400)
         except Exception:
             return Response({"detail": "Mailbox sync failed. Check the mailbox connection settings and try again."}, status=400)
+
+    @action(detail=True, methods=["post"], url_path="test-imap")
+    def test_imap(self, request, pk=None):
+        mailbox = self.get_object()
+        result = test_imap_via_relay(mailbox)
+        return Response(result, status=200 if result["ok"] else 400)
+
+    @action(detail=True, methods=["post"], url_path="test-smtp")
+    def test_smtp(self, request, pk=None):
+        mailbox = self.get_object()
+        recipient = request.data.get("recipient_email") or mailbox.email
+        result = send_via_mailbox(mailbox, recipient, "Mail Flow workspace mailbox test", "This is a test email from Mail Flow Mail Workspace.")
+        return Response(result, status=200 if result["ok"] else 400)

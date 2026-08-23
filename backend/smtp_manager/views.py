@@ -20,8 +20,15 @@ class SMTPAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
     action_roles = {"test_connection_hyphen": {"admin"}, "test_connection_underscore": {"admin"}, "send_test_hyphen": {"admin"}, "send_test_underscore": {"admin"}}
     search_fields = ("name", "host", "username", "from_email")
 
+    def get_queryset(self):  # pyright: ignore[reportIncompatibleMethodOverride]
+        queryset = super().get_queryset()
+        if self.request.user.role == "owner":
+            return queryset.filter(organization__isnull=True)
+        return queryset
+
     def perform_create(self, serializer):
-        serializer.save(organization=request_organization(self.request))
+        organization = None if self.request.user.role == "owner" else request_organization(self.request)
+        serializer.save(organization=organization)
 
     @action(detail=True, methods=["post"], url_path="test-connection", throttle_classes=[ScopedRateThrottle], throttle_scope="smtp_test")
     def test_connection_hyphen(self, request, pk=None):
@@ -52,14 +59,16 @@ class SMTPAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             return Response({"detail": "recipient_email is required"}, status=400)
         try:
             account = self.get_object()
-            validate_email_quota(account.organization, 1)
+            if account.organization_id:
+                validate_email_quota(account.organization, 1)
             sent_today = account.sent_today if account.sent_date == timezone.localdate() else 0
             if sent_today >= account.daily_limit:
                 return Response({"detail": "SMTP daily sending limit reached."}, status=400)
             subject = str(request.data.get("subject") or "Test Email from Mail Flow")[:180]
             message = str(request.data.get("message") or "This is a test email sent from Mail Flow.")[:20000]
             result = send_test_mail(account, recipient_email, subject=subject, message=message)
-            record_email_result(account.organization_id, sent=bool(result.get("ok")))
+            if account.organization_id:
+                record_email_result(account.organization_id, sent=bool(result.get("ok")))
             if result.get("ok"):
                 if account.sent_date != timezone.localdate():
                     account.sent_today = 0

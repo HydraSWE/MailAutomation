@@ -1,12 +1,15 @@
 import email
-import imaplib
+import base64
+import hashlib
+import hmac
+import json
 import re
-import smtplib
-import ssl
-from email.message import EmailMessage
+import time
+import uuid
 from email.header import decode_header, make_header
-from email.utils import formataddr, parseaddr
+from email.utils import parseaddr
 
+import requests
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -70,7 +73,9 @@ def send_support_reply(ticket, body, *, actor, mailbox=None):
     mailbox = mailbox or ticket.mailbox
     subject = ticket.subject if ticket.subject.lower().startswith("re:") else f"Re: {ticket.subject}"
     if mailbox:
-        _send_via_mailbox(mailbox, ticket.email, subject, body)
+        result = send_via_mailbox(mailbox, ticket.email, subject, body)
+        if not result["ok"]:
+            raise RuntimeError(result["message"])
     else:
         from billing.tasks import _send_message
 
@@ -91,24 +96,65 @@ def send_support_reply(ticket, body, *, actor, mailbox=None):
     return message
 
 
-def _send_via_mailbox(mailbox, recipient, subject, body):
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = formataddr((mailbox.from_name or mailbox.name, mailbox.email))
-    message["To"] = recipient
-    message.set_content(body)
-    context = ssl.create_default_context()
-    if mailbox.smtp_encryption == SupportMailbox.Encryption.SSL:
-        smtp = smtplib.SMTP_SSL(mailbox.smtp_host, mailbox.smtp_port, timeout=20, context=context)
-    else:
-        smtp = smtplib.SMTP(mailbox.smtp_host, mailbox.smtp_port, timeout=20)
+def mailbox_relay_payload(mailbox, recipient, subject, body):
+    return {
+        "encryption": str(mailbox.smtp_encryption or "tls").lower(),
+        "from_email": str(mailbox.email),
+        "from_name": str(mailbox.from_name or mailbox.name or "Mail Flow Support"),
+        "host": str(mailbox.smtp_host),
+        "password": str(mailbox.get_smtp_password()),
+        "port": int(mailbox.smtp_port or 587),
+        "reply_to": str(mailbox.email),
+        "username": str(mailbox.smtp_username),
+    }, {
+        "body": str(body),
+        "recipient": str(recipient).strip().lower(),
+        "subject": str(subject),
+    }
+
+
+def send_via_mailbox(mailbox, recipient, subject, body):
+    return _send_via_mailbox_relay(mailbox, recipient, subject, body)
+
+
+def _send_via_mailbox_relay(mailbox, recipient, subject, body):
+    relay_url = getattr(settings, "MAIL_FLOW_SMTP_TEST_RELAY_URL", "")
+    relay_secret = getattr(settings, "MAIL_FLOW_SMTP_TEST_RELAY_SECRET", "")
+    if not relay_url or not relay_secret:
+        return {"ok": False, "message": "Mailbox SMTP PHP relay is not configured.", "stage": "relay"}
+    smtp_payload, message_payload = mailbox_relay_payload(mailbox, recipient, subject, body)
+    timestamp = str(int(time.time()))
+    payload = {
+        "operation": "send_test",
+        "request_id": str(uuid.uuid4()),
+        "smtp": smtp_payload,
+        "message": message_payload,
+        "timestamp": timestamp,
+    }
+    raw_body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = hmac.new(relay_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     try:
-        if mailbox.smtp_encryption == SupportMailbox.Encryption.TLS:
-            smtp.starttls(context=context)
-        smtp.login(mailbox.smtp_username, mailbox.get_smtp_password())
-        smtp.send_message(message)
-    finally:
-        smtp.quit()
+        response = requests.post(
+            relay_url,
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Mail-Flow-Signature": signature,
+                "X-Mail-Flow-Timestamp": timestamp,
+            },
+            timeout=getattr(settings, "MAIL_FLOW_SMTP_TEST_RELAY_TIMEOUT", 25),
+        )
+        try:
+            response_data = response.json()
+        except ValueError:
+            response_data = {}
+        return {
+            "ok": bool(response_data.get("ok")),
+            "message": str(response_data.get("message") or "Mailbox SMTP relay request failed.")[:300],
+            "stage": str(response_data.get("stage") or "relay")[:40],
+        }
+    except requests.RequestException:
+        return {"ok": False, "message": "Mailbox SMTP relay could not be reached.", "stage": "relay"}
 
 
 def sync_mailbox(mailbox, *, limit=20):
@@ -116,21 +162,19 @@ def sync_mailbox(mailbox, *, limit=20):
         return {"imported": 0, "detail": "Mailbox is inactive."}
     imported = 0
     try:
-        connection = _imap_connect(mailbox)
-        try:
-            connection.select("INBOX")
-            # Read the most recent messages, not only messages still marked unread.
-            # A user may have opened mail in another client before this workspace syncs.
-            _, data = connection.search(None, "ALL")
-            ids = (data[0].split() if data and data[0] else [])[-int(limit):]
-            for message_id in ids:
-                _, message_data = connection.fetch(message_id, "(RFC822)")
-                raw = message_data[0][1] if message_data and message_data[0] else b""
-                if raw and _import_message(mailbox, raw):
-                    imported += 1
-                    connection.store(message_id, "+FLAGS", "\\Seen")
-        finally:
-            connection.logout()
+        result = imap_relay_request(mailbox, "sync", limit=limit)
+        if not result["ok"]:
+            raise RuntimeError(result["message"])
+        for relay_message in result.get("messages", []):
+            raw_value = relay_message.get("raw") if isinstance(relay_message, dict) else ""
+            if not raw_value:
+                continue
+            try:
+                raw = base64.b64decode(str(raw_value), validate=True)
+            except (ValueError, TypeError):
+                continue
+            if raw and _import_message(mailbox, raw):
+                imported += 1
         mailbox.last_synced_at = timezone.now()
         mailbox.last_error = ""
         mailbox.save(update_fields=("last_synced_at", "last_error", "updated_at"))
@@ -141,15 +185,60 @@ def sync_mailbox(mailbox, *, limit=20):
     return {"imported": imported}
 
 
-def _imap_connect(mailbox):
-    if mailbox.imap_encryption == SupportMailbox.Encryption.SSL:
-        connection = imaplib.IMAP4_SSL(mailbox.imap_host, mailbox.imap_port)
-    else:
-        connection = imaplib.IMAP4(mailbox.imap_host, mailbox.imap_port)
-        if mailbox.imap_encryption == SupportMailbox.Encryption.TLS:
-            connection.starttls()
-    connection.login(mailbox.imap_username, mailbox.get_imap_password())
-    return connection
+def imap_relay_payload(mailbox):
+    return {
+        "encryption": str(mailbox.imap_encryption or "ssl").lower(),
+        "host": str(mailbox.imap_host),
+        "mailbox": "INBOX",
+        "password": str(mailbox.get_imap_password()),
+        "port": int(mailbox.imap_port or 993),
+        "username": str(mailbox.imap_username),
+    }
+
+
+def test_imap_via_relay(mailbox):
+    return imap_relay_request(mailbox, "connection_test", limit=1)
+
+
+def imap_relay_request(mailbox, operation, *, limit=20):
+    relay_url = getattr(settings, "MAIL_FLOW_IMAP_SYNC_RELAY_URL", "")
+    relay_secret = getattr(settings, "MAIL_FLOW_IMAP_SYNC_RELAY_SECRET", "")
+    if not relay_url or not relay_secret:
+        return {"ok": False, "message": "Mailbox IMAP PHP relay is not configured.", "stage": "relay", "messages": []}
+    timestamp = str(int(time.time()))
+    payload = {
+        "operation": operation,
+        "request_id": str(uuid.uuid4()),
+        "imap": imap_relay_payload(mailbox),
+        "limit": int(limit),
+        "timestamp": timestamp,
+    }
+    raw_body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = hmac.new(relay_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    try:
+        response = requests.post(
+            relay_url,
+            data=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Mail-Flow-Signature": signature,
+                "X-Mail-Flow-Timestamp": timestamp,
+            },
+            timeout=getattr(settings, "MAIL_FLOW_IMAP_SYNC_RELAY_TIMEOUT", 30),
+        )
+        try:
+            response_data = response.json()
+        except ValueError:
+            response_data = {}
+        messages = response_data.get("messages") if isinstance(response_data.get("messages"), list) else []
+        return {
+            "ok": bool(response_data.get("ok")),
+            "message": str(response_data.get("message") or response_data.get("detail") or "Mailbox IMAP relay request failed.")[:300],
+            "stage": str(response_data.get("stage") or "relay")[:40],
+            "messages": messages,
+        }
+    except requests.RequestException:
+        return {"ok": False, "message": "Mailbox IMAP relay could not be reached.", "stage": "relay", "messages": []}
 
 
 def _decode(value):

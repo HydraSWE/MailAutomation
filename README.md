@@ -28,6 +28,7 @@ python generate_email_previews.py
 php -l deploy/php/mailflow-otp-relay.php
 php -l deploy/php/mailflow-smtp-test-relay.php
 php -l deploy/php/mailflow-campaign-relay.php
+php -l deploy/php/mailflow-imap-sync-relay.php
 ```
 
 Visual baselines live beside `frontend/tests/visual/workflows.spec.js` and cover

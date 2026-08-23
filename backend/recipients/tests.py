@@ -19,7 +19,7 @@ class OwnerOrganizationContextTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.owner)
 
-    def test_owner_can_create_list_in_selected_organization(self):
+    def test_owner_cannot_create_list_in_selected_organization(self):
         response = self.client.post(
             "/api/recipient-lists/",
             {"list_name": "Selected tenant list"},
@@ -27,10 +27,10 @@ class OwnerOrganizationContextTests(TestCase):
             HTTP_X_ORGANIZATION_ID=str(self.first.pk),
         )
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(RecipientList.objects.get().organization, self.first)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(RecipientList.objects.count(), 0)
 
-    def test_owner_selection_scopes_tenant_list_reads(self):
+    def test_owner_reads_all_recipient_lists_platform_wide(self):
         RecipientList.objects.create(list_name="First", organization=self.first, created_by=self.owner)
         RecipientList.objects.create(list_name="Second", organization=self.second, created_by=self.owner)
 
@@ -41,7 +41,7 @@ class OwnerOrganizationContextTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         results = response.data.get("results", response.data)
-        self.assertEqual([item["list_name"] for item in results], ["First"])
+        self.assertEqual({item["list_name"] for item in results}, {"First", "Second"})
 
     def test_owner_write_without_selection_remains_forbidden(self):
         response = self.client.post(

@@ -40,10 +40,14 @@ export function useUsersWorkspace() {
         usersApi.listUsers(params),
         api.get("/organizations/"),
       ]);
-      setUsers(userRes.data.results || userRes.data || []);
-      setOrganizations(orgRes.data.results || orgRes.data || []);
+      const rawUsers = userRes.data?.results ?? userRes.data;
+      const rawOrgs = orgRes.data?.results ?? orgRes.data;
+      setUsers(Array.isArray(rawUsers) ? rawUsers : []);
+      setOrganizations(Array.isArray(rawOrgs) ? rawOrgs : []);
     } catch (e) {
       setError(e.response?.data?.detail || "Unable to load data.");
+      setUsers([]);
+      setOrganizations([]);
     } finally {
       setLoading(false);
     }
@@ -54,13 +58,14 @@ export function useUsersWorkspace() {
   }, [filterOrg, filterRole, filterStatus]);
 
   const filtered = useMemo(() => {
-    if (!search) return users;
+    const list = Array.isArray(users) ? users : [];
+    if (!search) return list;
     const q = search.toLowerCase();
-    return users.filter(
+    return list.filter(
       (u) =>
-        (u.name || "").toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q)
+        (u?.name || "").toLowerCase().includes(q) ||
+        (u?.email || "").toLowerCase().includes(q) ||
+        (u?.username || "").toLowerCase().includes(q)
     );
   }, [users, search]);
 

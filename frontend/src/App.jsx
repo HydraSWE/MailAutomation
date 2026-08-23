@@ -40,6 +40,7 @@ import Payment from "./pages/Payment";
 import HelpSupport from "./pages/HelpSupport";
 import MailWorkspace from "./pages/MailWorkspace";
 import NotificationsPage from "./pages/NotificationsPage";
+import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
 
 import { getUser, isAuthenticated } from "./utils/auth";
 import { ToastProvider } from "./context/ToastContext";
@@ -51,15 +52,16 @@ function ProtectedRoute({ element, roles }) {
 }
 
 const router = createBrowserRouter([
-  { path: "/", element: <Landing /> },
-  { path: "/login", element: <Login /> },
-  { path: "/register", element: <Register /> },
-  { path: "/signup", element: <Register /> },
-  { path: "/subscribe/:planSlug", element: <Subscribe /> },
-  { path: "/payment/:invoiceId", element: <Payment /> },
-  { path: "/help", element: <HelpSupport /> },
+  { path: "/", element: <Landing />, errorElement: <RouteErrorBoundary /> },
+  { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
+  { path: "/register", element: <Register />, errorElement: <RouteErrorBoundary /> },
+  { path: "/signup", element: <Register />, errorElement: <RouteErrorBoundary /> },
+  { path: "/subscribe/:planSlug", element: <Subscribe />, errorElement: <RouteErrorBoundary /> },
+  { path: "/payment/:invoiceId", element: <Payment />, errorElement: <RouteErrorBoundary /> },
+  { path: "/help", element: <HelpSupport />, errorElement: <RouteErrorBoundary /> },
   {
     element: <AppLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { path: "/dashboard", element: <ProtectedRoute element={<Dashboard />} /> },
       { path: "/templates", element: <ProtectedRoute roles={["admin", "manager", "operator", "viewer"]} element={<Templates />} /> },

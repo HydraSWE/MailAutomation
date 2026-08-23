@@ -18,13 +18,19 @@ export default function PlatformOverview() {
       api.get("/platform/billing-configuration/"),
     ])
       .then(([orgs, active, billingConfig]) => {
-        setOrganizations(orgs.data.results || orgs.data);
-        setSessions(active.data.results || active.data);
+        const rawOrgs = orgs.data?.results ?? orgs.data;
+        const rawSessions = active.data?.results ?? active.data;
+        setOrganizations(Array.isArray(rawOrgs) ? rawOrgs : []);
+        setSessions(Array.isArray(rawSessions) ? rawSessions : []);
         if (billingConfig.data?.public_landing_monitor_active !== undefined) {
           setMonitorActive(Boolean(billingConfig.data.public_landing_monitor_active));
         }
       })
-      .catch((requestError) => setError(requestError.response?.data?.detail || "Unable to load the platform overview."))
+      .catch((requestError) => {
+        setError(requestError.response?.data?.detail || "Unable to load the platform overview.");
+        setOrganizations([]);
+        setSessions([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,14 +48,16 @@ export default function PlatformOverview() {
   };
 
   if (loading) return <div className="py-16 text-center text-sm text-slate-500">Loading platform overview…</div>;
-  const activeOrganizations = organizations.filter((item) => item.status === "active").length;
-  const activeSessions = sessions.filter((item) => !item.revoked_at).length;
-  const monthlyCapacity = organizations.reduce((sum, item) => sum + (Number(item.monthly_email_limit) || 0), 0);
+  const safeOrgs = Array.isArray(organizations) ? organizations : [];
+  const safeSessions = Array.isArray(sessions) ? sessions : [];
+  const activeOrganizations = safeOrgs.filter((item) => item?.status === "active").length;
+  const activeSessions = safeSessions.filter((item) => !item?.revoked_at).length;
+  const monthlyCapacity = safeOrgs.reduce((sum, item) => sum + (Number(item?.monthly_email_limit) || 0), 0);
   const stats = [
-    ["Organizations", organizations.length, `${activeOrganizations} active`, Building2, "text-indigo-300"],
-    ["Active sessions", activeSessions, `${sessions.length} recorded`, ShieldCheck, "text-emerald-300"],
+    ["Organizations", safeOrgs.length, `${activeOrganizations} active`, Building2, "text-indigo-300"],
+    ["Active sessions", activeSessions, `${safeSessions.length} recorded`, ShieldCheck, "text-emerald-300"],
     ["Monthly capacity", new Intl.NumberFormat().format(monthlyCapacity), "emails allocated", Mail, "text-cyan-300"],
-    ["Suspended", organizations.length - activeOrganizations, "organizations", Activity, "text-amber-300"],
+    ["Suspended", safeOrgs.length - activeOrganizations, "organizations", Activity, "text-amber-300"],
   ];
 
   return <div className="space-y-7">

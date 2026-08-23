@@ -65,3 +65,28 @@ class PlatformBroadcastSerializer(serializers.ModelSerializer):
             if any(field in attrs for field in mutable):
                 raise serializers.ValidationError({"detail": "Only draft broadcasts can be edited."})
         return attrs
+
+
+class PlatformBroadcastPreviewSerializer(serializers.Serializer):
+    target_roles = serializers.JSONField(default=list, required=False)
+    target_plan_slugs = serializers.JSONField(default=list, required=False)
+    target_organization_statuses = serializers.JSONField(default=list, required=False)
+    active_only = serializers.BooleanField(default=True, required=False)
+
+    def validate_target_roles(self, value):
+        values = normalize_list(value)
+        invalid = sorted(set(values) - VALID_ROLES)
+        if invalid:
+            raise serializers.ValidationError(f"Unsupported roles: {', '.join(invalid)}")
+        return values
+
+    def validate_target_organization_statuses(self, value):
+        values = normalize_list(value)
+        invalid = sorted(set(values) - VALID_ORGANIZATION_STATUSES)
+        if invalid:
+            raise serializers.ValidationError(f"Unsupported organization statuses: {', '.join(invalid)}")
+        return values
+
+    def validate_target_plan_slugs(self, value):
+        return normalize_list(value)
+

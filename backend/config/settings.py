@@ -189,6 +189,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "billing.tasks.send_upcoming_renewal_reminders",
         "schedule": crontab(hour=9, minute=0),
     },
+    "sync-support-mailboxes-every-minute": {
+        "task": "support.tasks.sync_all_active_support_mailboxes",
+        "schedule": float(os.getenv("SUPPORT_MAILBOX_SYNC_INTERVAL_SECONDS", "60.0")),
+    },
 }
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
@@ -202,6 +206,7 @@ MAIL_FLOW_SENDER_NAME = os.getenv("MAIL_FLOW_SENDER_NAME", "Mail Flow Billing")
 MAIL_FLOW_SENDER_EMAIL = os.getenv("MAIL_FLOW_SENDER_EMAIL", os.getenv("DEFAULT_FROM_EMAIL", "billing@example.com"))
 MAIL_FLOW_GENERAL_SENDER_NAME = os.getenv("MAIL_FLOW_GENERAL_SENDER_NAME", "Mail Flow")
 MAIL_FLOW_GENERAL_SENDER_EMAIL = os.getenv("MAIL_FLOW_GENERAL_SENDER_EMAIL", "mailflow@annomous.com")
+MAIL_FLOW_SUPPORT_EMAIL = os.getenv("MAIL_FLOW_SUPPORT_EMAIL", os.getenv("SUPPORT_EMAIL", "support@annomous.com"))
 MAIL_FLOW_REPLY_TO = os.getenv("MAIL_FLOW_REPLY_TO", "")
 DEFAULT_FROM_EMAIL = f"{MAIL_FLOW_SENDER_NAME} <{MAIL_FLOW_SENDER_EMAIL}>"
 MAIL_FLOW_OTP_RELAY_URL = os.getenv("MAIL_FLOW_OTP_RELAY_URL", "")

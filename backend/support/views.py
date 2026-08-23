@@ -16,7 +16,7 @@ from .serializers import (
     SupportReplySerializer,
     SupportTicketSerializer,
 )
-from .services import send_support_reply, send_via_mailbox, sync_mailbox, test_imap_via_relay
+from .services import add_customer_reply, send_support_reply, send_via_mailbox, sync_mailbox, test_imap_via_relay
 
 
 def workspace_allowed(user):
@@ -100,6 +100,7 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
                 "email": request.user.email,
                 "subject": request.data.get("subject", "Support request"),
                 "message": request.data.get("message", ""),
+                "priority": request.data.get("priority", SupportTicket.Priority.NORMAL),
             },
             context={"request": request},
         )
@@ -109,11 +110,17 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def reply(self, request, pk=None):
-        if not workspace_allowed(request.user):
-            return Response({"detail": "Mail workspace is not enabled."}, status=403)
         ticket = self.get_object()
         serializer = SupportReplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        if ticket.requester_id == request.user.id and not workspace_allowed(request.user):
+            message = add_customer_reply(ticket, serializer.validated_data["body"], actor=request.user)
+            return Response(SupportTicketSerializer(message.ticket).data)
+
+        if not workspace_allowed(request.user):
+            return Response({"detail": "Mail workspace is not enabled."}, status=403)
+
         mailbox = serializer.validated_data.get("mailbox")
         if request.user.role == "owner" and mailbox is None:
             return Response({"detail": "Select a platform support inbox before replying."}, status=400)

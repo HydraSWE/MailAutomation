@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Edit2, Inbox, MailPlus, Network, RefreshCw, Send, Settings2, Trash } from "lucide-react";
 import supportApi from "../services/supportApi";
 import CustomSelect from "../components/common/CustomSelect";
@@ -44,6 +44,7 @@ export default function MailWorkspace() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [access, setAccess] = useState(null);
+  const messagesEndRef = useRef(null);
 
   const selected = tickets.find((ticket) => ticket.id === selectedId) || tickets[0] || null;
   const visibleTickets = useMemo(
@@ -51,7 +52,7 @@ export default function MailWorkspace() {
     [tickets, filter]
   );
 
-  async function loadTickets(nextMailboxId, role = access?.role) {
+  async function loadTickets(nextMailboxId, role = access?.role, silent = false) {
     if (!nextMailboxId && role !== "owner") {
       setTickets([]);
       setSelectedId(null);
@@ -60,7 +61,13 @@ export default function MailWorkspace() {
     const ticketResponse = await supportApi.getTickets(role === "owner" ? undefined : { mailbox: nextMailboxId });
     const nextTickets = ticketResponse.data.results || ticketResponse.data || [];
     setTickets(nextTickets);
-    setSelectedId(nextTickets[0]?.id || null);
+    if (!silent) {
+      setSelectedId((prev) => {
+        if (!prev) return nextTickets[0]?.id || null;
+        const exists = nextTickets.some((t) => t.id === prev);
+        return exists ? prev : (nextTickets[0]?.id || null);
+      });
+    }
   }
 
   async function load(role = access?.role) {
@@ -100,6 +107,26 @@ export default function MailWorkspace() {
       .catch((requestError) => setError(requestError.response?.data?.detail || "Mail workspace is not available."))
       .finally(() => setLoading(false));
   }, []);
+
+  // Smart 15-second background polling for live admin inbox updates
+  useEffect(() => {
+    if (!access?.enabled) return;
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadTickets(mailboxId, access?.role, true);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [access?.enabled, access?.role, mailboxId]);
+
+  // Auto-scroll when selected ticket messages change
+  useEffect(() => {
+    if (typeof messagesEndRef.current?.scrollIntoView === "function") {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [selected?.messages?.length, selected?.id]);
 
   async function sendReply(event) {
     event.preventDefault();
@@ -398,6 +425,7 @@ export default function MailWorkspace() {
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
 
               <form onSubmit={sendReply} className="border-t border-slate-800 p-4">

@@ -8,12 +8,17 @@ from rest_framework.throttling import ScopedRateThrottle
 from common.permissions import OwnerOnly
 
 from .models import PlatformBroadcast, PlatformBroadcastDelivery
-from .serializers import PlatformBroadcastDeliverySerializer, PlatformBroadcastSerializer
+from .serializers import (
+    PlatformBroadcastDeliverySerializer,
+    PlatformBroadcastPreviewSerializer,
+    PlatformBroadcastSerializer,
+)
 from .services import preview_count
 from .tasks import launch_platform_broadcast
 
 
 class PlatformBroadcastViewSet(viewsets.ModelViewSet):
+    throttle_classes = []
     throttle_scope = None
     queryset = PlatformBroadcast.objects.select_related("created_by").all()
     serializer_class = PlatformBroadcastSerializer
@@ -24,13 +29,13 @@ class PlatformBroadcastViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    @action(detail=False, methods=["post"], throttle_classes=[ScopedRateThrottle], throttle_scope="platform_broadcast")
+    @action(detail=False, methods=["post"], throttle_classes=[])
     def preview(self, request):
-        serializer = self.get_serializer(data=request.data)
+        serializer = PlatformBroadcastPreviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response({"count": preview_count(serializer.validated_data)})
 
-    @action(detail=True, methods=["post"], throttle_classes=[ScopedRateThrottle], throttle_scope="platform_broadcast")
+    @action(detail=True, methods=["post"], throttle_classes=[])
     def launch(self, request, pk=None):
         with transaction.atomic():
             broadcast = PlatformBroadcast.objects.select_for_update().get(pk=self.get_object().pk)

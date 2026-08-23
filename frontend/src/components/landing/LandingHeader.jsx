@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { ArrowRight, CreditCard, HelpCircle, LogIn, Menu, ShieldCheck, Sparkles, UserPlus, X } from "lucide-react";
 import BrandLogo from "../BrandLogo";
 
 export default function LandingHeader() {
@@ -8,78 +8,91 @@ export default function LandingHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#060911]/80 backdrop-blur-xl transition-all">
-      <div className="max-w-7xl mx-auto h-20 px-5 lg:px-8 flex items-center justify-between">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Link to="/" className="group" aria-label="Mail Flow home">
           <BrandLogo className="h-10 w-auto max-w-[190px] object-contain transition-transform duration-300 group-hover:scale-[1.02]" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <a href="#features" className="hover:text-white transition-colors duration-200">
-            Features
+        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-300 md:flex">
+          <a href="#features" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+            <span>Features</span>
           </a>
-          <a href="#pricing" className="hover:text-white transition-colors duration-200">
-            Pricing
+          <a href="#pricing" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+            <CreditCard className="h-4 w-4 text-emerald-400" />
+            <span>Pricing</span>
           </a>
-          <a href="#security" className="hover:text-white transition-colors duration-200">
-            Security
+          <a href="#security" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+            <ShieldCheck className="h-4 w-4 text-cyan-400" />
+            <span>Security</span>
           </a>
-          <Link to="/help" className="hover:text-white transition-colors duration-200">
-            Help
+          <Link to="/help" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+            <HelpCircle className="h-4 w-4 text-amber-400" />
+            <span>Help</span>
           </Link>
         </nav>
 
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden items-center gap-4 md:flex">
           <Link
             to="/login"
-            className="px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
           >
-            Sign in
+            <LogIn className="h-4 w-4" />
+            <span>Sign in</span>
           </Link>
           <Link
             to="/register"
-            className="px-5 py-2.5 rounded-xl bg-white text-slate-950 text-sm font-bold hover:bg-slate-100 hover:shadow-lg hover:shadow-white/10 active:scale-95 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-white/10 transition-all hover:bg-slate-100 active:scale-95"
           >
-            Start free
+            <ArrowRight className="h-4 w-4" />
+            <span>Start free</span>
           </Link>
         </div>
 
         <button
-          className="md:hidden p-2.5 rounded-lg border border-white/10 text-slate-400 hover:text-white bg-slate-900/50"
+          type="button"
+          className="rounded-lg border border-white/10 bg-slate-900/50 p-2.5 text-slate-400 hover:text-white md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden px-6 py-5 border-t border-white/10 bg-[#060911]/98 backdrop-blur-2xl flex flex-col gap-4 text-slate-200 font-medium text-sm animate-in slide-in-from-top-2">
-          <a href="#features" onClick={() => setMobileOpen(false)} className="py-1 hover:text-indigo-400">
-            Features
+        <div className="flex animate-in flex-col gap-4 border-t border-white/10 bg-[#060911]/98 px-6 py-5 text-sm font-medium text-slate-200 backdrop-blur-2xl slide-in-from-top-2 md:hidden">
+          <a href="#features" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+            <span>Features</span>
           </a>
-          <a href="#pricing" onClick={() => setMobileOpen(false)} className="py-1 hover:text-indigo-400">
-            Pricing
+          <a href="#pricing" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+            <CreditCard className="h-4 w-4 text-emerald-400" />
+            <span>Pricing</span>
           </a>
-          <a href="#security" onClick={() => setMobileOpen(false)} className="py-1 hover:text-indigo-400">
-            Security
+          <a href="#security" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+            <ShieldCheck className="h-4 w-4 text-cyan-400" />
+            <span>Security</span>
           </a>
-          <Link to="/help" onClick={() => setMobileOpen(false)} className="py-1 hover:text-indigo-400">
-            Help & Support
+          <Link to="/help" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+            <HelpCircle className="h-4 w-4 text-amber-400" />
+            <span>Help and Support</span>
           </Link>
-          <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
+          <div className="flex flex-col gap-2.5 border-t border-white/10 pt-3">
             <Link
               to="/login"
               onClick={() => setMobileOpen(false)}
-              className="w-full text-center py-2.5 text-slate-300 font-semibold rounded-xl bg-white/5"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 py-2.5 font-semibold text-slate-300"
             >
-              Sign in
+              <LogIn className="h-4 w-4" />
+              <span>Sign in</span>
             </Link>
             <Link
               to="/register"
               onClick={() => setMobileOpen(false)}
-              className="w-full text-center py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 font-bold text-white shadow-lg shadow-indigo-600/30"
             >
-              Get Started Free
+              <UserPlus className="h-4 w-4" />
+              <span>Get Started Free</span>
             </Link>
           </div>
         </div>

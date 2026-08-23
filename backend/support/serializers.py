@@ -46,6 +46,7 @@ class PublicSupportTicketSerializer(serializers.Serializer):
     email = serializers.EmailField()
     subject = serializers.CharField(max_length=180)
     message = serializers.CharField(max_length=10000)
+    priority = serializers.ChoiceField(choices=SupportTicket.Priority.choices, required=False, default=SupportTicket.Priority.NORMAL)
 
     def create(self, validated_data):
         request = self.context.get("request")
@@ -57,6 +58,7 @@ class PublicSupportTicketSerializer(serializers.Serializer):
             email_address=validated_data["email"],
             subject=validated_data["subject"],
             body=validated_data["message"],
+            priority=validated_data.get("priority", SupportTicket.Priority.NORMAL),
             organization=organization,
             requester=requester,
             source="authenticated" if requester else "public",

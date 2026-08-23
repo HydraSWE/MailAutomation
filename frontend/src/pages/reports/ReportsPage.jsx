@@ -70,9 +70,27 @@ export default function ReportsPage() {
     usePagination(1, 10);
 
   const fetchDropdownOptions = async () => {
-    campaignsApi.getCampaigns().then((res) => setCampaignOptions(res.data.results || res.data || [])).catch(() => {});
-    smtpApi.getServers().then((res) => setSmtpOptions(res.data.results || res.data || [])).catch(() => {});
-    recipientsApi.getLists().then((res) => setListOptions(res.data.results || res.data || [])).catch(() => {});
+    campaignsApi
+      .getCampaigns()
+      .then((res) => {
+        const raw = res.data?.results ?? res.data;
+        setCampaignOptions(Array.isArray(raw) ? raw : []);
+      })
+      .catch(() => setCampaignOptions([]));
+    smtpApi
+      .getServers()
+      .then((res) => {
+        const raw = res.data?.results ?? res.data;
+        setSmtpOptions(Array.isArray(raw) ? raw : []);
+      })
+      .catch(() => setSmtpOptions([]));
+    recipientsApi
+      .getLists()
+      .then((res) => {
+        const raw = res.data?.results ?? res.data;
+        setListOptions(Array.isArray(raw) ? raw : []);
+      })
+      .catch(() => setListOptions([]));
   };
 
   const fetchSummary = useCallback(async () => {
@@ -120,9 +138,10 @@ export default function ReportsPage() {
           smtp_id: selectedSmtp || undefined,
           status: selectedStatus || undefined,
         });
-        const items = res.data.results || res.data || [];
+        const raw = res.data?.results ?? res.data;
+        const items = Array.isArray(raw) ? raw : [];
         setCampaignReports(items);
-        setTotalItems(res.data.count ?? items.length);
+        setTotalItems(res.data?.count ?? items.length);
       } else {
         const res = await reportsApi.getDeliveryLogs({
           page,
@@ -130,9 +149,10 @@ export default function ReportsPage() {
           search: logSearch || undefined,
           status: selectedStatus || undefined,
         });
-        const items = res.data.results || res.data || [];
+        const raw = res.data?.results ?? res.data;
+        const items = Array.isArray(raw) ? raw : [];
         setLogs(items);
-        setTotalItems(res.data.count ?? items.length);
+        setTotalItems(res.data?.count ?? items.length);
       }
     } catch (_e) {
       setCampaignReports([]);
@@ -163,9 +183,10 @@ export default function ReportsPage() {
         campaign_id: selectedCampaign || undefined,
         smtp_id: selectedSmtp || undefined,
       });
-      const mimeType = format === "xlsx"
-        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        : "text/csv;charset=utf-8;";
+      const mimeType =
+        format === "xlsx"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "text/csv;charset=utf-8;";
       const blob = new Blob([res.data], { type: mimeType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -221,182 +242,161 @@ export default function ReportsPage() {
     { key: "started_at", header: "Started Time", render: (val) => (val ? new Date(val).toLocaleDateString() : "-") },
     {
       key: "actions",
-      header: "Actions",
-      className: "text-right",
+      header: "Action",
       render: (_, row) => (
         <button
           onClick={() => navigate(`/reports/campaigns/${row.id}`)}
-          className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
-          title="View Full Report"
+          className="flex items-center gap-1 text-xs font-semibold text-indigo-400 hover:text-indigo-300"
         >
-          <Eye className="w-4 h-4" />
+          <Eye className="w-3.5 h-3.5" /> View
         </button>
       ),
     },
   ];
 
   const logColumns = [
-    { key: "recipient_email", header: "Recipient Email", render: (val) => <span className="font-mono text-slate-200">{val}</span> },
-    { key: "campaign_name", header: "Campaign", render: (val) => val || "Campaign" },
-    { key: "smtp_name", header: "SMTP Server", render: (val) => val || "Default SMTP" },
+    { key: "recipient_email", header: "Recipient Email" },
+    { key: "campaign_name", header: "Campaign", render: (val, row) => val || row.campaign?.name || "-" },
+    { key: "smtp_name", header: "SMTP Server", render: (val, row) => val || row.smtp?.name || "-" },
     { key: "status", header: "Status", render: (val) => <StatusBadge status={val} /> },
-    { key: "message", header: "Server Response", render: (val) => <span className="font-mono text-xs text-slate-400">{val || "250 2.0.0 OK"}</span> },
+    { key: "attempts", header: "Attempts" },
+    { key: "error_message", header: "Diagnosis / Error", render: (val) => <span className="text-xs text-rose-400 font-mono">{val || "-"}</span> },
     { key: "sent_at", header: "Sent Time", render: (val) => (val ? new Date(val).toLocaleString() : "-") },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header & Global Export Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Reports & Delivery Analytics</h1>
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <BarChart3 className="w-7 h-7 text-indigo-400" /> Deliverability & Analytics Reports
+          </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Monitor campaign benchmarks, email quotas, and delivery diagnostic logs.
+            Analyze campaign throughput, conversion performance, and deep SMTP diagnostic traces.
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleExport(activeTab, "csv")}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60 rounded-xl text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-medium text-slate-200 transition-colors"
           >
-            <Download className="w-4 h-4 text-slate-400" />
-            Export CSV
+            <Download className="w-3.5 h-3.5 text-slate-400" /> Export CSV
           </button>
           <button
             onClick={() => handleExport(activeTab, "xlsx")}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-600/25 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-medium text-slate-200 transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Export Excel
+            <Download className="w-3.5 h-3.5 text-slate-400" /> Export Excel
           </button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-        <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-slate-400">Total Campaigns</p>
-          <p className="text-xl font-bold text-slate-100 mt-1">{summary.total_campaigns}</p>
+      {/* Aggregate Metric Highlights Strip */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Campaigns</span>
+            <Layers className="w-4 h-4 text-indigo-400" />
+          </div>
+          <p className="text-2xl font-bold text-slate-100 mt-2">{summary.total_campaigns}</p>
         </div>
-        <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-slate-400">Emails Sent</p>
-          <p className="text-xl font-bold text-indigo-400 mt-1">{summary.total_emails_sent.toLocaleString()}</p>
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Total Sent</span>
+            <Send className="w-4 h-4 text-blue-400" />
+          </div>
+          <p className="text-2xl font-bold text-slate-100 mt-2">{summary.total_emails_sent}</p>
         </div>
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-emerald-400">Deliveries</p>
-          <p className="text-xl font-bold text-emerald-200 mt-1">{summary.successful_deliveries.toLocaleString()}</p>
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Delivered</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-400 mt-2">{summary.successful_deliveries}</p>
         </div>
-        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-rose-400">Failed Emails</p>
-          <p className="text-xl font-bold text-rose-200 mt-1">{summary.failed_deliveries.toLocaleString()}</p>
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Failed</span>
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          </div>
+          <p className="text-2xl font-bold text-rose-400 mt-2">{summary.failed_deliveries}</p>
         </div>
-        <div className="p-4 bg-teal-500/10 border border-teal-500/30 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-teal-400">Success Rate</p>
-          <p className="text-xl font-bold text-teal-200 mt-1">{summary.success_rate}%</p>
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Success Rate</span>
+            <BarChart3 className="w-4 h-4 text-indigo-400" />
+          </div>
+          <p className="text-2xl font-bold text-indigo-300 mt-2">{summary.success_rate}%</p>
         </div>
-        <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl shadow-lg">
-          <p className="text-xs font-semibold text-slate-400">Active Recipients</p>
-          <p className="text-xl font-bold text-slate-100 mt-1">{summary.active_recipients.toLocaleString()}</p>
-        </div>
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          <FilterDropdown
-            label="Date Range"
-            value={dateRange}
-            onChange={setDateRange}
-            options={[
-              { value: "7", label: "Last 7 Days" },
-              { value: "30", label: "Last 30 Days" },
-              { value: "90", label: "Last 90 Days" },
-            ]}
-          />
-
-          <FilterDropdown
-            label="Campaign"
-            value={selectedCampaign}
-            onChange={setSelectedCampaign}
-            options={campaignOptions.map((c) => ({ value: c.id, label: c.name }))}
-          />
-
-          <FilterDropdown
-            label="SMTP Server"
-            value={selectedSmtp}
-            onChange={setSelectedSmtp}
-            options={smtpOptions.map((s) => ({ value: s.id, label: s.name }))}
-          />
-
-          <FilterDropdown
-            label="Recipient List"
-            value={selectedList}
-            onChange={setSelectedList}
-            options={listOptions.map((l) => ({ value: l.id, label: l.name }))}
-          />
+        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span>Recipients</span>
+            <Users className="w-4 h-4 text-purple-400" />
+          </div>
+          <p className="text-2xl font-bold text-purple-300 mt-2">{summary.active_recipients}</p>
         </div>
       </div>
 
-      {/* Charts Section */}
-      <ReportCharts
-        dailyVolume={chartData.dailyVolume}
-        successRatio={chartData.successRatio}
-        campaignPerformance={chartData.campaignPerformance}
-        smtpUsage={chartData.smtpUsage}
-        failureReasons={chartData.failureReasons}
-      />
+      {/* Visual Analytics Graphs */}
+      <ReportCharts chartData={chartData} />
 
-      {/* Reports Data Table Tabs */}
-      <div className="space-y-4 pt-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
+      {/* Reports Table Explorer */}
+      <div className="space-y-4 pt-4 border-t border-slate-800">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
             <button
               onClick={() => {
                 setActiveTab("campaigns");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "campaigns"
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                  : "bg-slate-800/60 text-slate-400 hover:text-slate-200"
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "campaigns" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Campaign Reports
+              Campaigns Summary
             </button>
             <button
               onClick={() => {
                 setActiveTab("logs");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "logs"
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                  : "bg-slate-800/60 text-slate-400 hover:text-slate-200"
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                activeTab === "logs" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Delivery Logs
+              Delivery Traces Log
             </button>
           </div>
 
-          {activeTab === "logs" && (
-            <SearchInput
-              value={logSearch}
-              onChange={(val) => {
-                setLogSearch(val);
-                setPage(1);
-              }}
-              placeholder="Search delivery log recipient..."
-              className="w-64"
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab === "logs" && (
+              <SearchInput
+                placeholder="Filter email / diagnosis..."
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                className="w-48 text-xs"
+              />
+            )}
+            <FilterDropdown
+              label="Status"
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              options={[
+                { value: "", label: "All Statuses" },
+                { value: "completed", label: "Completed / Sent" },
+                { value: "failed", label: "Failed" },
+                { value: "pending", label: "Pending" },
+              ]}
+              className="text-xs"
             />
-          )}
+          </div>
         </div>
 
         <DataTable
           columns={activeTab === "campaigns" ? campaignColumns : logColumns}
           data={activeTab === "campaigns" ? campaignReports : logs}
           loading={loading}
-          emptyTitle={activeTab === "campaigns" ? "No campaign reports" : "No delivery logs"}
           pagination={{
             page,
             pageSize,
@@ -405,6 +405,11 @@ export default function ReportsPage() {
             onPageChange: setPage,
             onPageSizeChange: setPageSize,
           }}
+          emptyMessage={
+            activeTab === "campaigns"
+              ? "No campaign records found for current filters."
+              : "No delivery trace logs matching filter."
+          }
         />
       </div>
     </div>

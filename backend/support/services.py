@@ -25,7 +25,7 @@ def next_ticket_number():
     return f"{base}-{count:04d}"
 
 
-def create_support_ticket(*, name, email_address, subject, body, organization=None, requester=None, source="public", mailbox=None):
+def create_support_ticket(*, name, email_address, subject, body, priority=SupportTicket.Priority.NORMAL, organization=None, requester=None, source="public", mailbox=None):
     with transaction.atomic():
         ticket = SupportTicket.objects.create(
             organization=organization,
@@ -35,6 +35,7 @@ def create_support_ticket(*, name, email_address, subject, body, organization=No
             name=name.strip() or email_address,
             email=email_address.strip().lower(),
             subject=subject.strip() or "Support request",
+            priority=priority,
             source=source,
             last_message_at=timezone.now(),
         )
@@ -49,6 +50,25 @@ def create_support_ticket(*, name, email_address, subject, body, organization=No
         )
     notify_support_team(ticket)
     return ticket
+
+
+def add_customer_reply(ticket, body, *, actor):
+    subject = ticket.subject if ticket.subject.lower().startswith("re:") else f"Re: {ticket.subject}"
+    message = SupportMessage.objects.create(
+        ticket=ticket,
+        direction=SupportMessage.Direction.INBOUND,
+        sender_name=getattr(actor, "name", "") or getattr(actor, "username", "") or actor.email,
+        sender_email=actor.email,
+        recipient_email=(ticket.mailbox.email if ticket.mailbox else settings.MAIL_FLOW_REPLY_TO or "support@annomous.com"),
+        subject=subject,
+        body=body.strip(),
+        created_by=actor,
+    )
+    ticket.status = SupportTicket.Status.OPEN
+    ticket.last_message_at = timezone.now()
+    ticket.save(update_fields=("status", "last_message_at", "updated_at"))
+    notify_support_team(ticket)
+    return message
 
 
 def notify_support_team(ticket):

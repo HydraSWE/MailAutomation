@@ -19,7 +19,10 @@ export default function NotificationsPage() {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
 
-  const unreadCount = useMemo(() => notifications.filter((item) => !item.is_read).length, [notifications]);
+  const unreadCount = useMemo(() => {
+    const list = Array.isArray(notifications) ? notifications : [];
+    return list.filter((item) => !item?.is_read).length;
+  }, [notifications]);
 
   async function load() {
     setLoading(true);
@@ -29,9 +32,11 @@ export default function NotificationsPage() {
     if (filter && filter !== "unread") params.type = filter;
     try {
       const response = await api.get("/notifications/", { params });
-      setNotifications(response.data.results || response.data || []);
+      const raw = response.data?.results ?? response.data;
+      setNotifications(Array.isArray(raw) ? raw : []);
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Unable to load notifications.");
+      setNotifications([]);
     } finally {
       setLoading(false);
     }

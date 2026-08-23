@@ -59,7 +59,8 @@ export default function CampaignsPage() {
       };
 
       const res = await campaignsApi.getCampaigns(params);
-      const items = res.data.results || res.data || [];
+      const raw = res.data?.results ?? res.data;
+      const items = Array.isArray(raw) ? raw : [];
       const count = res.data.count ?? items.length;
 
       setCampaigns(items);
@@ -77,8 +78,9 @@ export default function CampaignsPage() {
   }, [fetchCampaigns]);
 
   // Header Stat Counters
-  const runningCount = campaigns.filter((c) => c.status === "running").length;
-  const scheduledCount = campaigns.filter((c) => c.status === "scheduled").length;
+  const safeCampaigns = Array.isArray(campaigns) ? campaigns : [];
+  const runningCount = safeCampaigns.filter((c) => c?.status === "running").length;
+  const scheduledCount = safeCampaigns.filter((c) => c?.status === "scheduled").length;
 
   const handleExecuteAction = async () => {
     const { type, campaign } = confirmAction;

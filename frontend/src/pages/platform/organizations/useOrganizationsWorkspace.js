@@ -38,28 +38,34 @@ export function useOrganizationsWorkspace() {
       api.get("/organizations/"),
       api.get("/billing/platform/plans/"),
     ]).then(([orgResponse, planResponse]) => {
-      setOrganizations(orgResponse.data.results || orgResponse.data);
-      setPlans(planResponse.data.results || planResponse.data);
+      const rawOrgs = orgResponse.data?.results ?? orgResponse.data;
+      const rawPlans = planResponse.data?.results ?? planResponse.data;
+      setOrganizations(Array.isArray(rawOrgs) ? rawOrgs : []);
+      setPlans(Array.isArray(rawPlans) ? rawPlans : []);
     });
 
   useEffect(() => {
     load()
-      .catch((requestError) =>
+      .catch((requestError) => {
         setError(
           requestError.response?.data?.detail || "Unable to load organizations."
-        )
-      )
+        );
+        setOrganizations([]);
+        setPlans([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(
-    () =>
-      organizations.filter(
+    () => {
+      const list = Array.isArray(organizations) ? organizations : [];
+      return list.filter(
         (org) =>
-          (status === "all" || org.status === status) &&
-          org.name.toLowerCase().includes(search.toLowerCase())
-      ),
-    [organizations, search, status]
+          (status === "all" || org?.status === status) &&
+          (org?.name || "").toLowerCase().includes(search.toLowerCase())
+      );
+    },
+    [organizations, status, search]
   );
 
   const selectedPlan = plans.find((plan) => plan.slug === form.plan_slug);

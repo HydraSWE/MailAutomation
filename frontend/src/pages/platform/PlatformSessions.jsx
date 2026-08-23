@@ -11,13 +11,29 @@ export default function PlatformSessions() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const load = () => { setLoading(true); return api.get("/sessions/").then((response) => setSessions(response.data.results || response.data)).catch((requestError) => setError(requestError.response?.data?.detail || "Unable to load sessions.")).finally(() => setLoading(false)); };
+  const load = () => {
+    setLoading(true);
+    return api
+      .get("/sessions/")
+      .then((response) => {
+        const raw = response.data?.results ?? response.data;
+        setSessions(Array.isArray(raw) ? raw : []);
+      })
+      .catch((requestError) => {
+        setError(requestError.response?.data?.detail || "Unable to load sessions.");
+        setSessions([]);
+      })
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, []);
-  const filtered = useMemo(() => sessions.filter((session) => {
-    const matchesStatus = filter === "all" || (filter === "active" ? !session.revoked_at : Boolean(session.revoked_at));
-    const needle = search.toLowerCase();
-    return matchesStatus && `${session.username} ${session.ip_address || ""}`.toLowerCase().includes(needle);
-  }), [sessions, filter, search]);
+  const filtered = useMemo(() => {
+    const list = Array.isArray(sessions) ? sessions : [];
+    return list.filter((session) => {
+      const matchesStatus = filter === "all" || (filter === "active" ? !session.revoked_at : Boolean(session.revoked_at));
+      const needle = search.toLowerCase();
+      return matchesStatus && `${session.username || ""} ${session.ip_address || ""}`.toLowerCase().includes(needle);
+    });
+  }, [sessions, filter, search]);
 
   async function revoke(session) {
     if (!window.confirm(`Force ${session.username} to sign out?`)) return;

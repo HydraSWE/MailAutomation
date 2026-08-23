@@ -21,3 +21,13 @@ celerybeat-schedule
 email_previews
 generate_email_previews.py
 email_templates_gallery.html
+help_previews
+generate_help_previews.py
+help_preview_gallery.html
+help_page_preview.html
+*test_*.py
+*test
+broadcast_previews
+generate_broadcast_previews.py
+broadcast_preview_gallery.html
+broadcast_page_preview.html

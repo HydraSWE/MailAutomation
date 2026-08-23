@@ -43,10 +43,10 @@ export function useRecipientsPage() {
   const fetchLists = async () => {
     try {
       const res = await recipientsApi.getLists();
-      const items = res.data.results || res.data || [];
-      setLists(items);
+      const raw = res.data?.results ?? res.data;
+      setLists(Array.isArray(raw) ? raw : []);
     } catch (_e) {
-      // ignore
+      setLists([]);
     }
   };
 
@@ -64,7 +64,8 @@ export function useRecipientsPage() {
       };
 
       const res = await recipientsApi.getRecipients(params);
-      const items = res.data.results || res.data || [];
+      const raw = res.data?.results ?? res.data;
+      const items = Array.isArray(raw) ? raw : [];
       const count = res.data.count ?? items.length;
 
       setRecipients(items);

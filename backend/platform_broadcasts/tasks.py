@@ -13,7 +13,13 @@ from .services import render_broadcast_html, target_user_queryset
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_platform_broadcast_delivery(self, delivery_id):
     try:
-        delivery = PlatformBroadcastDelivery.objects.select_related("broadcast").get(pk=delivery_id)
+        delivery = PlatformBroadcastDelivery.objects.select_related(
+            "broadcast",
+            "user",
+            "user__organization",
+            "user__organization__subscription",
+            "user__organization__subscription__plan",
+        ).get(pk=delivery_id)
     except PlatformBroadcastDelivery.DoesNotExist:
         return {"delivery_id": delivery_id, "status": "not_found"}
     if delivery.status in {PlatformBroadcastDelivery.Status.SENT, PlatformBroadcastDelivery.Status.SKIPPED}:
@@ -29,12 +35,20 @@ def send_platform_broadcast_delivery(self, delivery_id):
         status=PlatformBroadcastDelivery.Status.SENDING,
         attempts=delivery.attempts + 1,
     )
+    user = delivery.user
+    from .services import build_user_context, render_broadcast_html, render_personalization
+
+    context = build_user_context(user, broadcast)
+    rendered_subject = render_personalization(broadcast.subject, context)
+    rendered_body = render_personalization(broadcast.body, context)
+    rendered_html = render_broadcast_html(broadcast.subject, broadcast.body, user=user, broadcast=broadcast)
+
     try:
         _send_message(
-            broadcast.subject,
-            broadcast.body,
+            rendered_subject,
+            rendered_body,
             delivery.recipient_email,
-            render_broadcast_html(broadcast.subject, broadcast.body),
+            rendered_html,
             sender="general",
         )
     except Exception:

@@ -40,9 +40,11 @@ export default function SMTPPage() {
     setLoading(true);
     try {
       const res = await smtpApi.getServers();
-      setServers(res.data.results || res.data || []);
+      const raw = res.data?.results ?? res.data;
+      setServers(Array.isArray(raw) ? raw : []);
     } catch (_e) {
       toast.error("Failed to load SMTP configurations.");
+      setServers([]);
     } finally {
       setLoading(false);
     }
@@ -53,9 +55,10 @@ export default function SMTPPage() {
   }, [fetchServers]);
 
   // Aggregate Stats
-  const activeCount = servers.filter((s) => Boolean(s.status)).length;
-  const totalDailyLimit = servers.reduce((acc, s) => acc + (s.daily_limit || 0), 0);
-  const totalSentToday = servers.reduce((acc, s) => acc + (s.sent_today || s.emails_sent_today || 0), 0);
+  const safeServers = Array.isArray(servers) ? servers : [];
+  const activeCount = safeServers.filter((s) => Boolean(s?.status)).length;
+  const totalDailyLimit = safeServers.reduce((acc, s) => acc + (s?.daily_limit || 0), 0);
+  const totalSentToday = safeServers.reduce((acc, s) => acc + (s?.sent_today || s?.emails_sent_today || 0), 0);
   const remainingCapacity = Math.max(0, totalDailyLimit - totalSentToday);
 
   const handleToggleStatus = async (server) => {

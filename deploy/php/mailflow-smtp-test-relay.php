@@ -198,6 +198,9 @@ try {
     $recipient = is_array($message) ? strtolower(clean_header((string)($message['recipient'] ?? ''), 254)) : '';
     $subject = is_array($message) ? clean_header((string)($message['subject'] ?? ''), 180) : '';
     $body = is_array($message) ? substr((string)($message['body'] ?? ''), 0, 20000) : '';
+    $messageId = is_array($message) ? clean_header((string)($message['message_id'] ?? ''), 255) : '';
+    $inReplyTo = is_array($message) ? clean_header((string)($message['in_reply_to'] ?? ''), 500) : '';
+    $references = is_array($message) ? clean_header((string)($message['references'] ?? ''), 2000) : '';
     if (!filter_var($recipient, FILTER_VALIDATE_EMAIL) || $subject === '' || $body === '') {
         respond(400, ['detail' => 'A valid recipient, subject and body are required.']);
     }
@@ -212,6 +215,15 @@ try {
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=UTF-8',
     ];
+    if ($messageId !== '') {
+        $headers[] = 'Message-ID: ' . $messageId;
+    }
+    if ($inReplyTo !== '') {
+        $headers[] = 'In-Reply-To: ' . $inReplyTo;
+    }
+    if ($references !== '') {
+        $headers[] = 'References: ' . $references;
+    }
     if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
         $headers[] = 'Reply-To: ' . $replyTo;
     }

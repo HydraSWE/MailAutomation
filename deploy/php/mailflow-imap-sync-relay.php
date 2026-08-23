@@ -125,7 +125,7 @@ try {
         ]);
     }
 
-    $ids = imap_search($connection, 'ALL') ?: [];
+    $ids = imap_search($connection, 'UNSEEN') ?: [];
     sort($ids, SORT_NUMERIC);
     $ids = array_slice($ids, -$limit);
     $messages = [];

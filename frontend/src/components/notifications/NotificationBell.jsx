@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { isAuthenticated } from "../../utils/auth";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -11,6 +12,11 @@ export default function NotificationBell() {
   const panelRef = useRef(null);
 
   async function load() {
+    if (!isAuthenticated()) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
     setLoading(true);
     try {
       const [listResponse, countResponse] = await Promise.all([
@@ -26,6 +32,7 @@ export default function NotificationBell() {
       setLoading(false);
     }
   }
+
 
   useEffect(() => {
     load();

@@ -328,3 +328,98 @@ class ManualReviewActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=("approve", "reject", "refund"))
     notes = serializers.CharField(required=False, allow_blank=True, max_length=4000)
     refund_transaction_hash = serializers.CharField(required=False, allow_blank=True, max_length=128)
+
+
+# --- Custom Plan Quotes & Post-Payment Activation Serializers ---
+
+
+class CustomQuoteOtpRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    turnstile_token = serializers.CharField(required=False, allow_blank=True, max_length=4096)
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class CustomQuoteOtpVerifySerializer(serializers.Serializer):
+    verification_id = serializers.UUIDField()
+    otp = serializers.CharField(min_length=6, max_length=6)
+
+
+class CustomQuoteSubmitSerializer(serializers.Serializer):
+    verification_id = serializers.UUIDField()
+    customer_name = serializers.CharField(max_length=150)
+    organization_name = serializers.CharField(max_length=255)
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=4000)
+    requested_limits = serializers.DictField()
+
+
+from .models import CustomPlanQuote, EmailVerification
+
+
+class CustomPlanQuoteSerializer(serializers.ModelSerializer):
+    invoice = InvoiceSerializer(read_only=True)
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomPlanQuote
+        fields = (
+            "id", "quote_number", "status", "customer_name", "customer_email",
+            "organization_name", "notes", "requested_limits", "approved_limits",
+            "quoted_price_bdt", "selected_network", "owner_notes", "rejection_reason",
+            "reviewed_by_name", "reviewed_at", "invoice", "activated_at", "created_at",
+        )
+        read_only_fields = fields
+
+    def get_reviewed_by_name(self, obj):
+        if not obj.reviewed_by:
+            return None
+        return obj.reviewed_by.name or obj.reviewed_by.email
+
+
+class CustomQuoteApproveInvoiceSerializer(serializers.Serializer):
+    price_bdt = serializers.IntegerField(min_value=1)
+    network = serializers.ChoiceField(choices=PaymentInvoice.Network.choices)
+    approved_limits = serializers.DictField(required=False)
+    owner_notes = serializers.CharField(required=False, allow_blank=True, max_length=4000)
+
+
+class CustomQuoteRejectSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=4000)
+
+
+class CustomActivationStartSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=128)
+
+
+class CustomActivationVerifyOtpSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=128)
+    otp = serializers.CharField(min_length=6, max_length=6)
+
+
+class CustomActivationCompleteSerializer(serializers.Serializer):
+    session_token = serializers.CharField(max_length=128)
+    quote_id = serializers.UUIDField()
+    username = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+
+        username = (attrs.get("username") or "").strip()
+        if username:
+            if len(username) < 3:
+                raise serializers.ValidationError({"username": "Username must be at least 3 characters long."})
+            import re
+            if not re.match(r"^[a-zA-Z0-9_.-]+$", username):
+                raise serializers.ValidationError({"username": "Username may only contain letters, numbers, underscores, dots, and hyphens."})
+            attrs["username"] = username
+
+        if "name" in attrs:
+            attrs["name"] = (attrs.get("name") or "").strip()
+
+        return attrs
+

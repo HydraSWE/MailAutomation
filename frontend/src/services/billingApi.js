@@ -44,3 +44,51 @@ export const verifyInvoice = (id, transaction) => publicClient.post(`/billing/in
 export const recoverInvoice = (email) => publicClient.post("/billing/invoices/recover/", { email }).then((response) => response.data);
 export const replaceInvoice = (id, password) => publicClient.post(`/billing/invoices/${id}/replace/`, { password }).then((response) => response.data);
 export const cancelInvoice = (id) => publicClient.post(`/billing/invoices/${id}/cancel/`, {}).then((response) => response.data);
+
+// --- Custom Plan Quotes Public Flow ---
+export const requestCustomQuoteOtp = (email, turnstileToken = "") =>
+  publicClient.post("/billing/custom-quotes/request-otp/", { email, turnstile_token: turnstileToken }).then((res) => res.data);
+
+export const verifyCustomQuoteOtp = (verificationId, otp) =>
+  publicClient.post("/billing/custom-quotes/verify-otp/", { verification_id: verificationId, otp }).then((res) => res.data);
+
+export const submitCustomQuote = (payload) =>
+  publicClient.post("/billing/custom-quotes/submit/", payload).then((res) => res.data);
+
+// --- Platform Owner Custom Quotes Management ---
+export const fetchOwnerCustomQuotes = (params = {}) =>
+  apiClient.get("/billing/platform/custom-quotes/", { params }).then((res) => res.data);
+
+export const fetchOwnerCustomQuote = (quoteId) =>
+  apiClient.get(`/billing/platform/custom-quotes/${quoteId}/`).then((res) => res.data);
+
+export const approveOwnerCustomQuote = (quoteId, payload) =>
+  apiClient.post(`/billing/platform/custom-quotes/${quoteId}/approve-and-invoice/`, payload).then((res) => res.data);
+
+export const rejectOwnerCustomQuote = (quoteId, reason = "") =>
+  apiClient.post(`/billing/platform/custom-quotes/${quoteId}/reject/`, { reason }).then((res) => res.data);
+
+export const approveOwnerPaymentException = (quoteId, notes = "") =>
+  apiClient.post(`/billing/platform/custom-quotes/${quoteId}/payment-review/approve/`, { notes }).then((res) => res.data);
+
+export const rejectOwnerPaymentException = (quoteId, reason = "") =>
+  apiClient.post(`/billing/platform/custom-quotes/${quoteId}/payment-review/reject/`, { reason }).then((res) => res.data);
+
+// --- Post-Payment Custom Activation Flow ---
+export const startCustomActivation = (token) =>
+  publicClient.post("/billing/custom-quotes/activation/start/", { token }).then((res) => res.data);
+
+export const requestCustomActivationOtp = (token) =>
+  publicClient.post("/billing/custom-quotes/activation/request-otp/", { token }).then((res) => res.data);
+
+export const verifyCustomActivationOtp = (token, otp) =>
+  publicClient.post("/billing/custom-quotes/activation/verify-otp/", { token, otp }).then((res) => res.data);
+
+export const fetchCustomActivationPendingOrgs = (sessionToken) =>
+  publicClient.get("/billing/custom-quotes/activation/pending/", {
+    headers: { "X-Setup-Session": sessionToken },
+  }).then((res) => res.data);
+
+export const completeCustomActivation = (payload) =>
+  publicClient.post("/billing/custom-quotes/activation/complete/", payload).then((res) => res.data);
+

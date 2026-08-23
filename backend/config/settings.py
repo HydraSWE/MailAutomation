@@ -120,6 +120,8 @@ elif MEDIA_STORAGE_BACKEND not in {"filesystem", "local", ""}:
     raise ImproperlyConfigured("MEDIA_STORAGE_BACKEND must be 'filesystem' or 'vercel_blob'.")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+DISABLE_THROTTLING = os.getenv("DISABLE_THROTTLING", "1" if DEBUG else "0") == "1"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.authentication.SessionJWTAuthentication",
@@ -133,27 +135,39 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_RATES": {
-        "login": "10/minute",
-        "file_import": "10/hour",
-        "smtp_test": "20/hour",
-        "campaign_launch": "20/hour",
-        "password_change": "5/hour",
-        "public_signup": "5/hour",
-        "checkout_email": "5/hour",
-        "payment_verify": "10/hour",
-        "invoice_recover": "5/hour",
-        "otp_verify": "10/hour",
-        "transaction_verify": "10/hour",
-        "support_message": "10/hour",
-        "platform_broadcast": "20/hour",
+        "login": None if DISABLE_THROTTLING else "10/minute",
+        "file_import": None if DISABLE_THROTTLING else "10/hour",
+        "smtp_test": None if DISABLE_THROTTLING else "20/hour",
+        "campaign_launch": None if DISABLE_THROTTLING else "20/hour",
+        "password_change": None if DISABLE_THROTTLING else "5/hour",
+        "public_signup": None if DISABLE_THROTTLING else "5/hour",
+        "checkout_email": None if DISABLE_THROTTLING else "5/hour",
+        "payment_verify": None if DISABLE_THROTTLING else "10/hour",
+        "invoice_recover": None if DISABLE_THROTTLING else "5/hour",
+        "otp_verify": None if DISABLE_THROTTLING else "10/hour",
+        "transaction_verify": None if DISABLE_THROTTLING else "10/hour",
+        "support_message": None if DISABLE_THROTTLING else "10/hour",
+        "platform_broadcast": None if DISABLE_THROTTLING else "20/hour",
     },
     "NUM_PROXIES": int(os.getenv("NUM_PROXIES", "1")),
 }
+
+
 NUM_PROXIES = int(os.getenv("NUM_PROXIES", "1"))
 CORS_ALLOWED_ORIGINS = [x.strip() for x in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if x.strip()]
 if IS_PRODUCTION and any(origin == "*" for origin in CORS_ALLOWED_ORIGINS):
     raise ImproperlyConfigured("Wildcard CORS origins are not allowed in production.")
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-setup-session",
+]
 
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
@@ -190,7 +204,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=9, minute=0),
     },
     "sync-support-mailboxes-every-minute": {
-        "task": "support.tasks.sync_all_active_support_mailboxes",
+        "task": "support.sync_all_active_support_mailboxes",
         "schedule": float(os.getenv("SUPPORT_MAILBOX_SYNC_INTERVAL_SECONDS", "60.0")),
     },
 }

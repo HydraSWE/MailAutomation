@@ -486,3 +486,268 @@ def deliver_renewal_reminder_email(delivery: Any, admin_name: Optional[str] = No
     )
 
     send_system_email(subject, body, delivery.recipient_email, html=html, sender="billing")
+
+
+# --- Custom Plan Quotes & Post-Payment Activation Emails ---
+
+
+def deliver_custom_quote_received_email(quote: Any) -> None:
+    subject = f"Custom Plan Quote Request Received - {quote.quote_number}"
+    intro = f"Hello {quote.customer_name}, we have received your custom plan request for {quote.organization_name}."
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Organization", quote.organization_name),
+        ("Monthly Email Limit", f"{quote.requested_limits.get('email_limit', 0):,}"),
+        ("Admin Accounts", str(quote.requested_limits.get("max_admins", 0))),
+        ("Team Members", str(quote.requested_limits.get("max_users", 0))),
+        ("SMTP Connections", str(quote.requested_limits.get("max_smtp_accounts", 0))),
+        ("Status", "Under Review"),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"We have received your custom plan request (Quote #{quote.quote_number}) for {quote.organization_name}.\n"
+        "Our enterprise pricing team is reviewing your requirements and will generate your tailored invoice shortly.\n\n"
+        "Thank you for choosing Mail Flow."
+    )
+    html = build_html_shell(
+        "Custom Plan Quote Request Received",
+        intro,
+        rows,
+        f"{settings.FRONTEND_URL.rstrip('/')}/pricing",
+        "View Pricing Overview",
+        badge="Quote Submitted",
+        footer_note="You will receive an email as soon as your custom invoice is approved and ready for payment.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="billing")
+
+
+def deliver_owner_quote_alert_email(quote: Any) -> None:
+    owner_email = settings.MAIL_FLOW_GENERAL_SENDER_EMAIL or getattr(settings, "OWNER_ALERT_EMAIL", "admin@mailflow.io")
+    subject = f"New Enterprise Custom Quote Submitted - {quote.quote_number}"
+    intro = f"A new enterprise custom plan quote #{quote.quote_number} has been submitted for {quote.organization_name}."
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Customer Name", quote.customer_name),
+        ("Customer Email", quote.customer_email),
+        ("Organization", quote.organization_name),
+        ("Monthly Emails", f"{quote.requested_limits.get('email_limit', 0):,}"),
+        ("SMTP Connections", str(quote.requested_limits.get("max_smtp_accounts", 0))),
+    ]
+    review_url = f"{settings.FRONTEND_URL.rstrip('/')}/platform/custom-quotes"
+    body = (
+        f"Enterprise Quote Alert:\n"
+        f"Quote #{quote.quote_number} for {quote.organization_name} ({quote.customer_email})\n"
+        f"Review & Issue Invoice: {review_url}\n"
+    )
+    html = build_html_shell(
+        "New Custom Quote Pending Review",
+        intro,
+        rows,
+        review_url,
+        "Review Quote & Price",
+        badge="Action Required",
+        footer_note="Set the approved BDT price and select the receiving USDT network to generate a 72-hour invoice.",
+    )
+    send_system_email(subject, body, owner_email, html=html, sender="billing")
+
+
+def deliver_custom_quote_invoice_email(quote: Any) -> None:
+    invoice = quote.invoice
+    pay_url = f"{settings.FRONTEND_URL.rstrip('/')}/pay/{invoice.id}"
+    subject = f"Your Custom Plan Invoice is Ready (72h Expiration) - {quote.quote_number}"
+    intro = f"Hello {quote.customer_name}, your enterprise quote #{quote.quote_number} for {quote.organization_name} has been approved."
+    expires_str = format_datetime(invoice.expires_at)
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Organization", quote.organization_name),
+        ("Approved Price (BDT)", f"BDT {invoice.price_bdt:,}"),
+        ("USDT Amount", f"{invoice.amount_usdt} USDT"),
+        ("Network", invoice.get_network_display()),
+        ("Expires At", expires_str),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"Your custom plan invoice for {quote.organization_name} is ready.\n\n"
+        f"Amount: {invoice.amount_usdt} USDT ({invoice.get_network_display()})\n"
+        f"Invoice expires in 72 hours on: {expires_str}\n\n"
+        f"Pay Invoice: {pay_url}\n\n"
+        "After payment is confirmed on-chain, you will be invited to set up your workspace admin password."
+    )
+    html = build_html_shell(
+        "Custom Plan Invoice Ready",
+        intro,
+        rows,
+        pay_url,
+        "Pay Invoice Now",
+        badge="72-Hour Invoice",
+        footer_note="Please send the exact USDT amount before the 72-hour window expires to avoid micro-rate recalculations.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="billing")
+
+
+def deliver_custom_quote_rejected_email(quote: Any) -> None:
+    subject = f"Update Regarding Your Custom Quote - {quote.quote_number}"
+    intro = f"Hello {quote.customer_name}, thank you for your interest in Mail Flow enterprise solutions."
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Organization", quote.organization_name),
+        ("Status", "Declined"),
+        ("Reason", quote.rejection_reason or "Requirements outside current supported capacity"),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"Regarding your custom plan quote #{quote.quote_number} for {quote.organization_name}:\n"        f"We are unable to approve this custom configuration at this time.\n\n"
+        f"Reason: {quote.rejection_reason or 'Unsupported configuration'}\n\n"
+        "Feel free to check our standard plans or submit an adjusted quote request."
+    )
+    html = build_html_shell(
+        "Quote Request Update",
+        intro,
+        rows,
+        f"{settings.FRONTEND_URL.rstrip('/')}/pricing",
+        "View Standard Plans",
+        badge="Quote Update",
+        footer_note="If you have questions, please reach out to our enterprise support desk.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="billing")
+
+
+def deliver_owner_payment_exception_email(invoice: Any, reason: str) -> None:
+    owner_email = settings.MAIL_FLOW_GENERAL_SENDER_EMAIL or getattr(settings, "OWNER_ALERT_EMAIL", "admin@mailflow.io")
+    subject = f"Payment Exception Flagged: {reason} on Invoice #{invoice.id}"
+    review_url = f"{settings.FRONTEND_URL.rstrip('/')}/platform/custom-quotes"
+    rows = [
+        ("Invoice ID", str(invoice.id)),
+        ("Expected USDT", str(invoice.amount_usdt)),
+        ("Network", invoice.get_network_display()),
+        ("Flagged Reason", reason),
+        ("Transaction Hash", invoice.transaction_hash or "N/A"),
+    ]
+    body = f"Payment Exception Alert: {reason} on invoice {invoice.id}.\nReview queue: {review_url}\n"
+    html = build_html_shell(
+        "Payment Exception Flagged",
+        f"A blockchain payment requires manual review: {reason}",
+        rows,
+        review_url,
+        "Review Payment Exception",
+        badge="Exception Alert",
+        footer_note="Investigate the transaction hash on the blockchain explorer before approving or rejecting.",
+    )
+    send_system_email(subject, body, owner_email, html=html, sender="billing")
+
+
+def deliver_custom_quote_payment_confirmed_email(quote: Any, raw_intent_token: str) -> None:
+
+    activation_url = f"{settings.FRONTEND_URL.rstrip('/')}/activate-custom-plan/{raw_intent_token}"
+    subject = f"Payment Confirmed! Activate Your Workspace - {quote.organization_name}"
+    intro = f"Hello {quote.customer_name}, we have confirmed your on-chain payment for {quote.organization_name}."
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Organization", quote.organization_name),
+        ("Plan", "Enterprise Custom"),
+        ("Monthly Emails", f"{quote.approved_limits.get('email_limit', 0):,}"),
+        ("Payment Status", "Confirmed"),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"Your payment for {quote.organization_name} has been verified on-chain!\n\n"
+        f"Activate your workspace & set your admin password: {activation_url}\n\n"
+        "For your security, you will be asked to verify a one-time code sent to this email address."
+    )
+    html = build_html_shell(
+        "Payment Confirmed - Activate Workspace",
+        intro,
+        rows,
+        activation_url,
+        "Activate Workspace & Set Password",
+        badge="Payment Verified",
+        footer_note="This secure activation link will expire in 7 days. Please do not forward this email.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="billing")
+
+
+def deliver_custom_activation_otp_email(email: str, otp: str, organization_name: str) -> None:
+    subject = f"{otp} is your Mail Flow workspace activation code"
+    intro = f"Use this verification code to confirm ownership of {email} and activate your workspace for {organization_name}."
+    rows = [
+        ("Verification Code", otp),
+        ("Organization", organization_name),
+        ("Code Validity", "10 minutes"),
+    ]
+    body = (
+        f"Your Mail Flow activation code is: {otp}\n\n"
+        f"This code will expire in 10 minutes.\n"
+        f"If you did not initiate this activation, please contact support immediately."
+    )
+    html = build_html_shell(
+        "Confirm Workspace Activation",
+        intro,
+        rows,
+        "",
+        "",
+        badge="Security Verification",
+        footer_note="Never share your verification code with anyone.",
+    )
+    send_system_email(subject, body, email, html=html, sender="billing")
+
+
+def deliver_custom_quote_payment_rejected_email(quote: Any, reason: str = "") -> None:
+    subject = f"Payment Exception Rejected - {quote.quote_number}"
+    intro = f"Hello {quote.customer_name}, the payment claim for {quote.organization_name} has been reviewed and rejected."
+    rows = [
+        ("Quote Number", quote.quote_number),
+        ("Organization", quote.organization_name),
+        ("Status", "Payment Rejected"),
+        ("Reason", reason or "Invalid or unverified transaction claim"),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"Your payment claim for quote #{quote.quote_number} ({quote.organization_name}) could not be verified and has been rejected.\n\n"
+        f"Reason: {reason or 'Invalid or unverified transaction'}\n\n"
+        "If you believe this is an error, please contact our enterprise support team with your transaction hash."
+    )
+    html = build_html_shell(
+        "Payment Exception Rejected",
+        intro,
+        rows,
+        f"{settings.FRONTEND_URL.rstrip('/')}/pricing",
+        "View Enterprise Pricing",
+        badge="Payment Rejected",
+        footer_note="For payment disputes or assistance, contact support.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="billing")
+
+
+def deliver_custom_workspace_ready_email(quote: Any) -> None:
+    login_url = f"{settings.FRONTEND_URL.rstrip('/')}/login"
+    subject = f"Your Custom Enterprise Workspace is Ready - {quote.organization_name}"
+    intro = f"Hello {quote.customer_name}, your enterprise workspace {quote.organization_name} is now live and fully activated!"
+    admin_username = quote.activated_user.username if getattr(quote, "activated_user", None) else quote.customer_email.split("@")[0]
+    rows = [
+        ("Organization", quote.organization_name),
+        ("Admin Username", admin_username),
+        ("Admin Email", quote.customer_email),
+        ("Plan", "Enterprise Custom"),
+        ("Monthly Emails", f"{quote.approved_limits.get('email_limit', 0):,}"),
+        ("SMTP Connections", str(quote.approved_limits.get("max_smtp_accounts", 0))),
+        ("Status", "Active (30-Day Subscription)"),
+    ]
+    body = (
+        f"Hello {quote.customer_name},\n\n"
+        f"Your enterprise workspace for {quote.organization_name} has been provisioned!\n\n"
+        f"Sign in at: {login_url}\n"
+        f"Login Username: {admin_username}\n"
+        f"Login Email: {quote.customer_email}\n\n"
+        "Use the password you configured during activation."
+    )
+    html = build_html_shell(
+        "Workspace Successfully Provisioned",
+        intro,
+        rows,
+        login_url,
+        "Sign In to Your Workspace",
+        badge="Workspace Live",
+        footer_note="Welcome to Mail Flow Enterprise. Let us know if you need any assistance getting started.",
+    )
+    send_system_email(subject, body, quote.customer_email, html=html, sender="general")
+

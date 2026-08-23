@@ -217,3 +217,83 @@ def send_upcoming_renewal_reminders() -> dict[str, int]:
         "failed": failed_count,
         "skipped": skipped_count,
     }
+
+
+# --- Custom Plan Quotes & Activation Celery Tasks ---
+
+
+from .emails import (
+    deliver_custom_activation_otp_email,
+    deliver_custom_quote_invoice_email,
+    deliver_custom_quote_payment_confirmed_email,
+    deliver_custom_quote_payment_rejected_email,
+    deliver_custom_quote_received_email,
+    deliver_custom_quote_rejected_email,
+    deliver_custom_workspace_ready_email,
+    deliver_owner_payment_exception_email,
+    deliver_owner_quote_alert_email,
+)
+from .models import CustomPlanQuote
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_quote_received_email(quote_id: str) -> str:
+    quote = CustomPlanQuote.objects.get(pk=quote_id)
+    deliver_custom_quote_received_email(quote)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_owner_quote_alert_email(quote_id: str) -> str:
+    quote = CustomPlanQuote.objects.get(pk=quote_id)
+    deliver_owner_quote_alert_email(quote)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_quote_invoice_email(quote_id: str) -> str:
+    quote = CustomPlanQuote.objects.select_related("invoice", "invoice__plan").get(pk=quote_id)
+    deliver_custom_quote_invoice_email(quote)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_quote_rejected_email(quote_id: str) -> str:
+    quote = CustomPlanQuote.objects.get(pk=quote_id)
+    deliver_custom_quote_rejected_email(quote)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_owner_payment_exception_email(invoice_id: str, reason: str) -> str:
+    invoice = PaymentInvoice.objects.get(pk=invoice_id)
+    deliver_owner_payment_exception_email(invoice, reason)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_quote_payment_confirmed_email(quote_id: str, raw_intent_token: str) -> str:
+    quote = CustomPlanQuote.objects.select_related("invoice").get(pk=quote_id)
+    deliver_custom_quote_payment_confirmed_email(quote, raw_intent_token)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_activation_otp_email(email: str, otp: str, organization_name: str) -> str:
+    deliver_custom_activation_otp_email(email, otp, organization_name)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_quote_payment_rejected_email(quote_id: str, reason: str) -> str:
+    quote = CustomPlanQuote.objects.get(pk=quote_id)
+    deliver_custom_quote_payment_rejected_email(quote, reason)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_custom_workspace_ready_email(quote_id: str) -> str:
+    quote = CustomPlanQuote.objects.select_related("activated_organization", "activated_user").get(pk=quote_id)
+    deliver_custom_workspace_ready_email(quote)
+    return "sent"
+

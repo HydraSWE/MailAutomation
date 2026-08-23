@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CreditCard, LayoutDashboard, Megaphone, Settings, ShieldCheck, Tags, Users } from "lucide-react";
+import { Building2, CreditCard, FileSpreadsheet, LayoutDashboard, Megaphone, Settings, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 const tabs = [
   ["/platform", "Overview", LayoutDashboard, true],
+  ["/platform/custom-quotes", "Custom Quotes", Sparkles],
   ["/platform/organizations", "Organizations", Building2],
   ["/platform/users", "Users", Users],
   ["/platform/plans", "Plans", Tags],
@@ -11,6 +12,7 @@ const tabs = [
   ["/platform/sessions", "Sessions & Security", ShieldCheck],
   ["/platform/settings", "Settings", Settings],
 ];
+
 
 export default function PlatformAdmin() {
   return <div className="space-y-6">

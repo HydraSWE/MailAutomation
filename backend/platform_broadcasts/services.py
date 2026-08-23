@@ -48,12 +48,6 @@ def preview_count(attrs: dict[str, Any], instance: PlatformBroadcast | None = No
     return target_user_queryset(broadcast).count()
 
 
-<<<<<<< HEAD
-def render_broadcast_html(subject: str, body: str) -> str:
-    from billing.emails import build_html_shell
-
-    lines = [part.strip() for part in body.splitlines() if part.strip()]
-=======
 def build_user_context(user=None, broadcast: PlatformBroadcast | None = None) -> dict[str, str]:
     if not user:
         return {
@@ -140,7 +134,7 @@ def render_broadcast_html(subject: str, body: str, user=None, broadcast=None) ->
     rendered_body = render_personalization(body, context)
 
     lines = [part.strip() for part in rendered_body.splitlines() if part.strip()]
->>>>>>> 0044d19 (polish_full)
+
     intro = lines[0] if lines else "A platform update is available."
     remaining = lines[1:] if len(lines) > 1 else []
 
@@ -153,15 +147,12 @@ def render_broadcast_html(subject: str, body: str, user=None, broadcast=None) ->
         custom_content = f'<div style="margin-top:12px;">{paragraphs_html}</div>'
 
     return build_html_shell(
-<<<<<<< HEAD
-        title=subject,
-=======
         title=rendered_subject,
->>>>>>> 0044d19 (polish_full)
         intro=intro,
         custom_content=custom_content,
         badge="Platform Announcement",
         footer_note="You received this platform announcement as a registered user of Mail Flow.",
         template_name="emails/billing/base.html",
     )
+
 

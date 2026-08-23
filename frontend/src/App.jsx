@@ -32,11 +32,13 @@ import PlatformSessions from "./pages/platform/PlatformSessions";
 import PlatformUsers from "./pages/platform/PlatformUsers";
 import PlatformPlans from "./pages/platform/PlatformPlans";
 import PlatformSettings from "./pages/platform/PlatformSettings";
+import PlatformCustomQuotes from "./pages/platform/custom_quotes/PlatformCustomQuotes";
 import AccountAdmin from "./pages/AccountAdmin";
 import Landing from "./pages/Landing";
 import Register from "./pages/Register";
 import Subscribe from "./pages/Subscribe";
 import Payment from "./pages/Payment";
+import ActivateCustomPlan from "./pages/custom_activation/ActivateCustomPlan";
 import HelpSupport from "./pages/HelpSupport";
 import MailWorkspace from "./pages/MailWorkspace";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -58,6 +60,8 @@ const router = createBrowserRouter([
   { path: "/signup", element: <Register />, errorElement: <RouteErrorBoundary /> },
   { path: "/subscribe/:planSlug", element: <Subscribe />, errorElement: <RouteErrorBoundary /> },
   { path: "/payment/:invoiceId", element: <Payment />, errorElement: <RouteErrorBoundary /> },
+  { path: "/pay/:invoiceId", element: <Payment />, errorElement: <RouteErrorBoundary /> },
+  { path: "/activate-custom-plan/:token", element: <ActivateCustomPlan />, errorElement: <RouteErrorBoundary /> },
   { path: "/help", element: <HelpSupport />, errorElement: <RouteErrorBoundary /> },
   {
     element: <AppLayout />,
@@ -89,6 +93,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute roles={["owner"]} element={<PlatformAdmin />} />,
         children: [
           { index: true, element: <PlatformOverview /> },
+          { path: "custom-quotes", element: <PlatformCustomQuotes /> },
           { path: "organizations", element: <PlatformOrganizations /> },
           { path: "users", element: <PlatformUsers /> },
           { path: "plans", element: <PlatformPlans /> },
@@ -103,6 +108,7 @@ const router = createBrowserRouter([
   },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
+
 
 export default function App() {
   return <ToastProvider><RouterProvider router={router} /></ToastProvider>;

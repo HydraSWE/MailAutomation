@@ -79,12 +79,16 @@ class PaymentInvoice(models.Model):
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        PAYMENT_DETECTED = "payment_detected", "Payment detected"
+        CONFIRMING = "confirming", "Confirming"
         VERIFYING = "verifying", "Verifying"
         PAID = "paid", "Paid"
+        REVIEW_REQUIRED = "review_required", "Review required"
         EXPIRED = "expired", "Expired"
         CANCELLED = "cancelled", "Cancelled"
         REPLACED = "replaced", "Replaced"
         MANUAL_REVIEW = "manual_review", "Manual review"
+        PAYMENT_REJECTED = "payment_rejected", "Payment rejected"
         REJECTED = "rejected", "Rejected"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -110,7 +114,7 @@ class PaymentInvoice(models.Model):
     token_decimals = models.PositiveSmallIntegerField(default=6)
     amount_raw = models.DecimalField(max_digits=48, decimal_places=0, default=Decimal("0"))
     snapshot_limits = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.PENDING)
     transaction_hash = models.CharField(max_length=128, null=True, blank=True)
     transfer_index = models.PositiveIntegerField(default=0)
     verification_error = models.TextField(blank=True)
@@ -128,6 +132,14 @@ class PaymentInvoice(models.Model):
     manual_review_email_error = models.TextField(blank=True)
     expires_at = models.DateTimeField()
     verified_at = models.DateTimeField(null=True, blank=True)
+    issued_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    fx_rate_locked_at = models.DateTimeField(null=True, blank=True)
+    fx_rate_source = models.CharField(max_length=64, default="runtime_billing_config", blank=True)
+    base_usdt_amount = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    exception_reason = models.CharField(max_length=32, blank=True)
+    confirmations_required = models.PositiveIntegerField(default=12)
+    confirmations_reached = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -141,12 +153,12 @@ class PaymentInvoice(models.Model):
             ),
             models.UniqueConstraint(
                 fields=("normalized_customer_email",),
-                condition=Q(status__in=("pending", "verifying")),
+                condition=Q(status__in=("pending", "verifying", "payment_detected", "confirming")),
                 name="unique_active_invoice_per_normalized_email",
             ),
             models.UniqueConstraint(
                 fields=("normalized_organization_name",),
-                condition=Q(status__in=("pending", "verifying")),
+                condition=Q(status__in=("pending", "verifying", "payment_detected", "confirming")),
                 name="unique_active_invoice_per_normalized_org",
             ),
             models.UniqueConstraint(
@@ -155,6 +167,94 @@ class PaymentInvoice(models.Model):
                 name="unique_checkout_idempotency_per_email",
             ),
         ]
+
+
+class CustomPlanQuote(models.Model):
+    class Status(models.TextChoices):
+        PENDING_REVIEW = "pending_review", "Pending Review"
+        INVOICED = "invoiced", "Invoiced"
+        PAYMENT_REVIEW = "payment_review", "Payment Review"
+        PAID = "paid", "Paid"
+        ACTIVATION_PENDING = "activation_pending", "Activation Pending"
+        ACTIVATED = "activated", "Activated"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    quote_number = models.CharField(max_length=32, unique=True, db_index=True)
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.PENDING_REVIEW, db_index=True)
+
+    customer_name = models.CharField(max_length=150)
+    customer_email = models.EmailField()
+    normalized_customer_email = models.EmailField(db_index=True)
+    organization_name = models.CharField(max_length=255)
+    normalized_organization_name = models.CharField(max_length=255, db_index=True)
+    notes = models.TextField(blank=True)
+    initial_email_verified_at = models.DateTimeField(null=True, blank=True)
+
+    requested_limits = models.JSONField(default=dict)
+    approved_limits = models.JSONField(default=dict, blank=True)
+
+    quoted_price_bdt = models.PositiveIntegerField(null=True, blank=True)
+    selected_network = models.CharField(max_length=16, choices=PaymentInvoice.Network.choices, blank=True)
+    owner_notes = models.TextField(blank=True)
+    rejection_reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="reviewed_custom_quotes")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    invoice = models.OneToOneField("PaymentInvoice", null=True, blank=True, on_delete=models.SET_NULL, related_name="custom_quote")
+
+    activation_intent_digest = models.CharField(max_length=64, blank=True, db_index=True)
+    activation_intent_created_at = models.DateTimeField(null=True, blank=True)
+    activation_intent_expires_at = models.DateTimeField(null=True, blank=True)
+    activation_intent_used_at = models.DateTimeField(null=True, blank=True)
+
+    activated_organization = models.ForeignKey("common.Organization", null=True, blank=True, on_delete=models.SET_NULL, related_name="custom_quotes")
+    activated_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="activated_custom_quotes")
+    activated_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.quote_number} - {self.organization_name} ({self.status})"
+
+
+class EmailVerification(models.Model):
+    class Purpose(models.TextChoices):
+        CUSTOM_QUOTE_SUBMISSION = "quote_submission", "Custom Quote Submission"
+        CUSTOM_PLAN_ACTIVATION = "plan_activation", "Custom Plan Activation"
+        CHECKOUT = "checkout", "Standard Checkout"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField()
+    normalized_email = models.EmailField(db_index=True)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices, default=Purpose.CUSTOM_QUOTE_SUBMISSION, db_index=True)
+    code_digest = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=5)
+    expires_at = models.DateTimeField(db_index=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+
+class CustomPlanSetupSession(models.Model):
+    quote = models.ForeignKey(CustomPlanQuote, on_delete=models.CASCADE, related_name="setup_sessions")
+    token_digest = models.CharField(max_length=64, unique=True, db_index=True)
+    email_verification = models.ForeignKey(EmailVerification, on_delete=models.CASCADE)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
 
 
 class CheckoutSession(models.Model):
@@ -246,6 +346,7 @@ class PaymentTransferLedger(models.Model):
 class PaymentSecurityAuditEvent(models.Model):
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     invoice = models.ForeignKey(PaymentInvoice, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_events")
+    quote = models.ForeignKey(CustomPlanQuote, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_events")
     ledger = models.ForeignKey(PaymentTransferLedger, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_events")
     event_type = models.CharField(max_length=64)
     metadata = models.JSONField(default=dict, blank=True)
@@ -284,4 +385,5 @@ class BillingReminderDelivery(models.Model):
 
     def __str__(self):
         return f"Renewal reminder for {self.recipient_email} - {self.subscription_id} ({self.renewal_date})"
+
 

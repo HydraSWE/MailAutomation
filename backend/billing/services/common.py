@@ -102,15 +102,17 @@ def amount_to_raw(amount, decimals):
     return (Decimal(amount) * (Decimal(10) ** int(decimals))).quantize(Decimal("1"))
 
 
-def audit_event(event_type, *, invoice=None, ledger=None, actor=None, request=None, metadata=None):
+def audit_event(event_type, *, invoice=None, quote=None, ledger=None, actor=None, request=None, metadata=None):
     PaymentSecurityAuditEvent.objects.create(
         event_type=event_type,
         invoice=invoice,
+        quote=quote,
         ledger=ledger,
         actor=actor if getattr(actor, "is_authenticated", False) else None,
         ip_hash=private_hash(client_ip(request)) if request else "",
         metadata=metadata or {},
     )
+
 
 
 

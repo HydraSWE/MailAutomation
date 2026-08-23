@@ -31,3 +31,4 @@ broadcast_previews
 generate_broadcast_previews.py
 broadcast_preview_gallery.html
 broadcast_page_preview.html
+simulate_custom_payment.py

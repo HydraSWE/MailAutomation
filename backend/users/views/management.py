@@ -23,7 +23,13 @@ class UserViewSet(viewsets.ModelViewSet):
         # Admin can only create users in their own organization
         if actor.role == User.Role.ADMIN:
             serializer.validated_data["organization"] = actor.organization
-        serializer.save()
+        user = serializer.save()
+        if user.email:
+            try:
+                from billing.emails import provision_lead_hunter_license
+                provision_lead_hunter_license(user.email, plan_name="Pro", days=30)
+            except Exception:
+                pass
 
     def perform_update(self, serializer):
         actor = _request_user(self.request)

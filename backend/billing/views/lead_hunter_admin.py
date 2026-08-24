@@ -18,8 +18,9 @@ class PlatformLeadHunterLicensesView(APIView):
     allowed_roles = {"owner"}
 
     def get(self, request):
-        """Fetch all Lead Hunter licenses from the database/relay."""
+        """Fetch all Lead Hunter licenses and auto-sync active Mail Flow users."""
         url, secret = get_relay_credentials()
+        relay_licenses = []
         try:
             resp = requests.post(
                 url,
@@ -30,11 +31,82 @@ class PlatformLeadHunterLicensesView(APIView):
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("ok"):
-                    return Response({"results": data.get("licenses", [])})
+                    relay_licenses = data.get("licenses", [])
         except Exception as exc:
             logger.warning("Failed to query Lead Hunter relay: %s", exc)
 
-        # Fallback local dummy/cached data if relay is temporarily unreachable
+        # Existing emails already in relay
+        existing_emails = {lic["email"].lower() for lic in relay_licenses if lic.get("email")}
+
+        # Auto-provision any active Mail Flow users linked to their exact subscription period
+        try:
+            from users.models import User
+            from datetime import date, timedelta
+            active_users = User.objects.filter(is_active=True).exclude(email="").select_related("organization", "organization__subscription", "organization__subscription__plan")
+            
+            for user in active_users:
+                u_email = user.email.lower().strip()
+                sub = None
+                if user.organization_id:
+                    try:
+                        sub = getattr(user.organization, "subscription", None)
+                    except Exception:
+                        sub = None
+
+                today = date.today()
+                if sub and sub.current_period_end:
+                    expiry_date = sub.current_period_end.date()
+                    plan_name = sub.plan.name if sub.plan else "Pro"
+                    status_str = "active" if sub.status == "active" and expiry_date >= today else "expired"
+                else:
+                    join_date = user.date_joined.date() if user.date_joined else today
+                    expiry_date = join_date + timedelta(days=30)
+                    plan_name = "Pro"
+                    status_str = "active" if expiry_date >= today else "expired"
+
+                days_remaining = max(1, (expiry_date - today).days)
+                expiry_str = expiry_date.isoformat()
+                today_str = (user.date_joined.date() if user.date_joined else today).isoformat()
+
+                if u_email not in existing_emails:
+                    # Provision into relay with exact subscription expiry
+                    try:
+                        requests.post(
+                            url,
+                            json={
+                                "action": "provision",
+                                "email": u_email,
+                                "plan": plan_name,
+                                "days": days_remaining,
+                                "expires_at": expiry_str
+                            },
+                            headers={"Content-Type": "application/json", "X-Mail-Flow-Secret": secret},
+                            timeout=5
+                        )
+                    except Exception:
+                        pass
+
+                    # Add to response view
+                    relay_licenses.append({
+                        "id": user.id + 100000,
+                        "email": u_email,
+                        "licenseKey": f"MF-LH-AUTO-{str(user.id).zfill(4)}-{plan_name.upper().replace(' ', '')}",
+                        "status": status_str,
+                        "plan": plan_name,
+                        "issuedAt": today_str,
+                        "expiresAt": expiry_str,
+                        "deviceLocked": False,
+                        "deviceId": None,
+                        "totalExtracted": 0,
+                    })
+                    existing_emails.add(u_email)
+        except Exception as exc:
+            logger.warning("Failed to auto-sync active users: %s", exc)
+
+        if relay_licenses:
+            return Response({"results": relay_licenses})
+
+        # Fallback local data if relay is empty
         return Response({
             "results": [
                 {

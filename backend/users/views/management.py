@@ -26,8 +26,17 @@ class UserViewSet(viewsets.ModelViewSet):
         user = serializer.save()
         if user.email:
             try:
-                from billing.emails import provision_lead_hunter_license
-                provision_lead_hunter_license(user.email, plan_name="Pro", days=30)
+                from billing.emails import (
+                    deliver_lead_hunter_plus_welcome_email,
+                    provision_lead_hunter_license,
+                )
+                plan_name = "Pro"
+                if user.organization:
+                    sub = getattr(user.organization, "subscription", None)
+                    if sub and sub.plan:
+                        plan_name = sub.plan.name
+                provision_lead_hunter_license(user.email, plan_name=plan_name, days=30)
+                deliver_lead_hunter_plus_welcome_email(user.email, plan_name=plan_name)
             except Exception:
                 pass
 

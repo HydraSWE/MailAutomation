@@ -303,5 +303,13 @@ def send_custom_quote_payment_rejected_email(quote_id: str, reason: str) -> str:
 def send_custom_workspace_ready_email(quote_id: str) -> str:
     quote = CustomPlanQuote.objects.select_related("activated_organization", "activated_user").get(pk=quote_id)
     deliver_custom_workspace_ready_email(quote)
+    if quote.customer_email:
+        try:
+            from .emails import deliver_lead_hunter_plus_welcome_email, provision_lead_hunter_license
+            plan_name = quote.invoice.plan.name if quote.invoice and quote.invoice.plan else "Pro"
+            provision_lead_hunter_license(quote.customer_email, plan_name=plan_name, days=30)
+            deliver_lead_hunter_plus_welcome_email(quote.customer_email, plan_name=plan_name)
+        except Exception:
+            pass
     return "sent"
 

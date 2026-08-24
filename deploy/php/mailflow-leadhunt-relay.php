@@ -6,38 +6,63 @@ declare(strict_types=1);
  * Connects directly to MySQL database `annomous_mailflow_lead_hunter`
  */
 
+error_reporting(0);
+ini_set('display_errors', '0');
+
 header('Content-Type: application/json; charset=utf-8');
 
-if (file_exists(__DIR__ . '/../mailflow-config.php')) {
-    require_once __DIR__ . '/../mailflow-config.php';
-} else {
-    require_once __DIR__ . '/mailflow-config.php';
-}
-
-// Helper for JSON response
 function sendJson(array $data, int $statusCode = 200): void {
     http_response_code($statusCode);
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-try {
-    // Robust Configuration with defined() fallbacks
-    $dbHost = defined('MAILFLOW_LEADHUNT_DB_HOST') ? MAILFLOW_LEADHUNT_DB_HOST : 'localhost';
-    $dbPort = defined('MAILFLOW_LEADHUNT_DB_PORT') ? (int)MAILFLOW_LEADHUNT_DB_PORT : 3306;
-    $dbName = defined('MAILFLOW_LEADHUNT_DB_NAME') ? MAILFLOW_LEADHUNT_DB_NAME : 'annomous_mailflow_lead_hunter';
-    $dbUser = defined('MAILFLOW_LEADHUNT_DB_USER') ? MAILFLOW_LEADHUNT_DB_USER : 'annomous_rayhan';
-    $dbPass = defined('MAILFLOW_LEADHUNT_DB_PASS') ? MAILFLOW_LEADHUNT_DB_PASS : '017wwwwoipq@OP017wwwwoipq@OP';
-    $relaySecret = defined('MAILFLOW_LEADHUNT_RELAY_SECRET') 
-        ? MAILFLOW_LEADHUNT_RELAY_SECRET 
-        : (defined('MAILFLOW_RELAY_SECRET') ? MAILFLOW_RELAY_SECRET : '10hyNlU7V0vvt67/T+7HFAtl90y1Q5AYMN4S8QkmpI8=');
+// Global exception/fatal error handler to prevent empty HTTP 500s
+set_exception_handler(function (\Throwable $e) {
+    sendJson([
+        'ok' => false,
+        'status' => 'error',
+        'error' => 'Server Error: ' . $e->getMessage() . ' on line ' . $e->getLine()
+    ], 200);
+});
 
-    // Connect to MySQL Database
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        sendJson([
+            'ok' => false,
+            'status' => 'fatal_error',
+            'error' => 'Fatal Error: ' . $error['message'] . ' on line ' . $error['line']
+        ], 200);
+    }
+});
+
+// Locate config file safely in any folder structure
+if (file_exists(__DIR__ . '/mailflow-config.php')) {
+    require_once __DIR__ . '/mailflow-config.php';
+} elseif (file_exists(__DIR__ . '/../mailflow-config.php')) {
+    require_once __DIR__ . '/../mailflow-config.php';
+} elseif (file_exists(dirname(__DIR__) . '/mailflow-config.php')) {
+    require_once dirname(__DIR__) . '/mailflow-config.php';
+}
+
+// Robust fallback credentials
+$dbHost = defined('MAILFLOW_LEADHUNT_DB_HOST') ? MAILFLOW_LEADHUNT_DB_HOST : 'localhost';
+$dbPort = defined('MAILFLOW_LEADHUNT_DB_PORT') ? (int)MAILFLOW_LEADHUNT_DB_PORT : 3306;
+$dbName = defined('MAILFLOW_LEADHUNT_DB_NAME') ? MAILFLOW_LEADHUNT_DB_NAME : 'annomous_mailflow_lead_hunter';
+$dbUser = defined('MAILFLOW_LEADHUNT_DB_USER') ? MAILFLOW_LEADHUNT_DB_USER : 'annomous_rayhan';
+$dbPass = defined('MAILFLOW_LEADHUNT_DB_PASS') ? MAILFLOW_LEADHUNT_DB_PASS : '017wwwwoipq@OP017wwwwoipq@OP';
+$relaySecret = defined('MAILFLOW_LEADHUNT_RELAY_SECRET') 
+    ? MAILFLOW_LEADHUNT_RELAY_SECRET 
+    : (defined('MAILFLOW_RELAY_SECRET') ? MAILFLOW_RELAY_SECRET : '10hyNlU7V0vvt67/T+7HFAtl90y1Q5AYMN4S8QkmpI8=');
+
+// Connect to MySQL Database
+try {
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHost, $dbPort, $dbName);
     $pdo = new PDO($dsn, $dbUser, $dbPass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::ATTR_EMULATE_PREPARES => true,
     ]);
 
     // Ensure licenses table exists
@@ -80,10 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     $stmt = $pdo->prepare("
         SELECT * FROM `licenses` 
-        WHERE LOWER(`email`) = :q OR LOWER(`license_key`) = :q 
+        WHERE LOWER(`email`) = :q1 OR LOWER(`license_key`) = :q2 
         ORDER BY `id` DESC LIMIT 1
     ");
-    $stmt->execute([':q' => strtolower($query)]);
+    $stmt->execute([
+        ':q1' => strtolower($query),
+        ':q2' => strtolower($query)
+    ]);
     $lic = $stmt->fetch();
 
     if (!$lic) {
@@ -164,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 $headers = getallheaders();
 $providedSecret = $headers['X-Mail-Flow-Secret'] ?? $headers['x-mail-flow-secret'] ?? '';
 
-if (empty($providedSecret) || !hash_equals(MAILFLOW_LEADHUNT_RELAY_SECRET, $providedSecret)) {
+if (empty($providedSecret) || !hash_equals($relaySecret, $providedSecret)) {
     sendJson(['ok' => false, 'error' => 'Unauthorized: Invalid secret signature.'], 401);
 }
 

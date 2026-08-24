@@ -781,26 +781,51 @@ def deliver_custom_workspace_ready_email(quote: Any) -> None:
 
 def deliver_lead_hunter_plus_welcome_email(user_email: str, plan_name: str = "Pro") -> None:
     """
-    Sends the official Lead Hunter PLUS companion onboarding email to paid subscribers.
+    Sends the official Lead Hunter companion onboarding email using Mail Flow's standard brand shell.
     """
-    subject = "Welcome to Mail Flow Plus — Get Your Lead Hunter Chrome Extension! 🚀"
+    subject = "Welcome to Mail Flow — Your Lead Hunter Pro Access is Ready! 🚀"
+    intro = f"As part of your active Mail Flow subscription, complimentary access to the Lead Hunter Pro Chrome extension has been provisioned for {user_email}."
+    
+    rows = [
+        ("Account Email", user_email),
+        ("Lead Hunter Tier", f"{plan_name} Edition"),
+        ("Features Included", "5 B2B Scrapers + Deep Verification"),
+        ("Single-Device Security", "Hardware Locked"),
+        ("Status", "Active"),
+    ]
+    
+    custom_content = (
+        "<div style=\"background-color:#0B0F17;border:1px solid #1E293B;border-radius:10px;padding:20px;margin:20px 0;\">"
+        "<div style=\"font-size:12px;font-weight:700;color:#38BDF8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;\">Quick Setup in 2 Steps</div>"
+        "<ol style=\"margin:0;padding-left:18px;color:#94A3B8;font-size:13px;line-height:1.7;\">"
+        "<li style=\"margin-bottom:6px;\">Install the <strong>Mail Flow - Lead Hunter</strong> Chrome extension.</li>"
+        f"<li>Open the extension, enter your registered email (<strong style=\"color:#F8FAFC;\">{escape(user_email)}</strong>), and click <strong style=\"color:#38BDF8;\">Activate</strong>.</li>"
+        "</ol>"
+        "</div>"
+    )
+    
+    cta_url = getattr(settings, "LEAD_HUNTER_CHROME_STORE_URL", "https://chromewebstore.google.com")
+    cta_label = "Get Lead Hunter for Chrome"
+    
     body = (
         f"Hello,\n\n"
-        f"Thank you for subscribing to Mail Flow! As an active subscriber, you have unlocked complimentary access to the Mail Flow - Lead Hunter Chrome extension.\n\n"
-        f"How to activate:\n"
-        f"1. Install the extension from the Chrome Web Store.\n"
-        f"2. Open the extension popup and enter your Mail Flow account email: {user_email}\n"
-        f"3. Click Activate — your {plan_name} Lead Hunter access will immediately unlock!\n\n"
+        f"Your complimentary access to Mail Flow - Lead Hunter Pro has been provisioned for {user_email}!\n\n"
+        f"To get started:\n"
+        f"1. Install the extension from Chrome Web Store: {cta_url}\n"
+        f"2. Open the popup, enter your email ({user_email}), and click Activate.\n\n"
         f"Best regards,\n"
         f"The Mail Flow Team"
     )
-    html = render_to_string(
-        "emails/billing/lead_hunter_welcome.html",
-        {
-            "user_email": user_email,
-            "plan_name": plan_name,
-            "chrome_store_url": getattr(settings, "LEAD_HUNTER_CHROME_STORE_URL", "https://chromewebstore.google.com"),
-        },
+    
+    html = build_html_shell(
+        "Lead Hunter Pro Unlocked",
+        intro,
+        rows=rows,
+        cta_url=cta_url,
+        cta_label=cta_label,
+        custom_content=custom_content,
+        badge="Lead Hunter Pro",
+        footer_note="Need help with lead generation or cold outreach? Contact our support team anytime.",
     )
     send_system_email(subject, body, user_email, html=html, sender="billing")
 

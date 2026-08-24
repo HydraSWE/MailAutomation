@@ -28,6 +28,7 @@ import SettingsPage from "./pages/settings/SettingsPage";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import PlatformOverview from "./pages/platform/PlatformOverview";
 import PlatformOrganizations from "./pages/platform/PlatformOrganizations";
+import PlatformLeadHunter from "./pages/platform/PlatformLeadHunter";
 import PlatformBilling from "./pages/platform/PlatformBilling";
 import PlatformBroadcasts from "./pages/platform/PlatformBroadcasts";
 import PlatformSessions from "./pages/platform/PlatformSessions";
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute roles={["owner"]} element={<PlatformAdmin />} />,
         children: [
           { index: true, element: <PlatformOverview /> },
+          { path: "lead-hunter", element: <PlatformLeadHunter /> },
           { path: "custom-quotes", element: <PlatformCustomQuotes /> },
           { path: "organizations", element: <PlatformOrganizations /> },
           { path: "users", element: <PlatformUsers /> },

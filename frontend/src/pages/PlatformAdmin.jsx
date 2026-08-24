@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CreditCard, FileSpreadsheet, LayoutDashboard, Megaphone, Settings, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Building2, CreditCard, Crosshair, FileSpreadsheet, LayoutDashboard, Megaphone, Settings, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 const tabs = [
   ["/platform", "Overview", LayoutDashboard, true],
+  ["/platform/lead-hunter", "Lead Hunter", Crosshair],
   ["/platform/custom-quotes", "Custom Quotes", Sparkles],
   ["/platform/organizations", "Organizations", Building2],
   ["/platform/users", "Users", Users],

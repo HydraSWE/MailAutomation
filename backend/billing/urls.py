@@ -9,6 +9,7 @@ from .views import (
     PaymentReviewViewSet, PlanAdminViewSet, PlanListView, PublicLandingMonitorView,
     CustomQuoteOtpRequestView, CustomQuoteOtpVerifyView, CustomQuoteSubmitView,
     OwnerCustomQuoteViewSet,
+    PlatformLeadHunterLicensesView, PlatformLeadHunterActionView,
     CustomActivationStartView, CustomActivationRequestOtpView, CustomActivationVerifyOtpView,
     CustomActivationPendingOrgsView, CustomActivationCompleteView,
 )
@@ -35,6 +36,8 @@ urlpatterns = [
     path("platform/payment-reviews/<int:pk>/", review_detail, name="platform-payment-review-detail"),
     path("platform/payment-reviews/<int:pk>/action/", review_action, name="platform-payment-review-action"),
     path("platform/bsc-transaction-inspect/", BscTransactionInspectView.as_view(), name="platform-bsc-transaction-inspect"),
+    path("platform/lead-hunter/licenses/", PlatformLeadHunterLicensesView.as_view(), name="platform-lead-hunter-licenses"),
+    path("platform/lead-hunter/licenses/<str:license_key>/action/", PlatformLeadHunterActionView.as_view(), name="platform-lead-hunter-action"),
 
     # Platform Owner Custom Quote Endpoints
     path("platform/custom-quotes/", owner_quote_list, name="platform-custom-quote-list"),

@@ -21,6 +21,7 @@ from .invoices import (
 )
 from .monitoring import PublicLandingMonitorView
 from .owner_custom_quotes import OwnerCustomQuoteViewSet
+from .lead_hunter_admin import PlatformLeadHunterLicensesView, PlatformLeadHunterActionView
 from .plans import PaymentReviewViewSet, PlanAdminViewSet, PlanListView
 
 __all__ = [name for name in globals() if name.endswith(("View", "ViewSet"))]

@@ -45,3 +45,4 @@ templates/**
 backend/templates/**
 lead-hunter-welcome-email.html
 .agents
+deploy/php/

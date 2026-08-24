@@ -21,15 +21,20 @@ function sendJson(array $data, int $statusCode = 200): void {
     exit;
 }
 
-// Connect to MySQL Database
 try {
-    $dsn = sprintf(
-        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
-        MAILFLOW_LEADHUNT_DB_HOST,
-        MAILFLOW_LEADHUNT_DB_PORT,
-        MAILFLOW_LEADHUNT_DB_NAME
-    );
-    $pdo = new PDO($dsn, MAILFLOW_LEADHUNT_DB_USER, MAILFLOW_LEADHUNT_DB_PASS, [
+    // Robust Configuration with defined() fallbacks
+    $dbHost = defined('MAILFLOW_LEADHUNT_DB_HOST') ? MAILFLOW_LEADHUNT_DB_HOST : 'localhost';
+    $dbPort = defined('MAILFLOW_LEADHUNT_DB_PORT') ? (int)MAILFLOW_LEADHUNT_DB_PORT : 3306;
+    $dbName = defined('MAILFLOW_LEADHUNT_DB_NAME') ? MAILFLOW_LEADHUNT_DB_NAME : 'annomous_mailflow_lead_hunter';
+    $dbUser = defined('MAILFLOW_LEADHUNT_DB_USER') ? MAILFLOW_LEADHUNT_DB_USER : 'annomous_rayhan';
+    $dbPass = defined('MAILFLOW_LEADHUNT_DB_PASS') ? MAILFLOW_LEADHUNT_DB_PASS : '017wwwwoipq@OP017wwwwoipq@OP';
+    $relaySecret = defined('MAILFLOW_LEADHUNT_RELAY_SECRET') 
+        ? MAILFLOW_LEADHUNT_RELAY_SECRET 
+        : (defined('MAILFLOW_RELAY_SECRET') ? MAILFLOW_RELAY_SECRET : '10hyNlU7V0vvt67/T+7HFAtl90y1Q5AYMN4S8QkmpI8=');
+
+    // Connect to MySQL Database
+    $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHost, $dbPort, $dbName);
+    $pdo = new PDO($dsn, $dbUser, $dbPass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
@@ -56,8 +61,12 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-} catch (PDOException $e) {
-    sendJson(['ok' => false, 'error' => 'Database connection failure: ' . $e->getMessage()], 500);
+} catch (\Throwable $e) {
+    sendJson([
+        'ok' => false,
+        'status' => 'db_error',
+        'error' => 'Database Connection Error: ' . $e->getMessage()
+    ], 200);
 }
 
 // 2. Handle GET verification (from Chrome Extension login / startup)

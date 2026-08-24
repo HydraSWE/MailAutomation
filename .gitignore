@@ -37,11 +37,11 @@ broadcast_previews
 generate_broadcast_previews.py
 broadcast_preview_gallery.html
 broadcast_page_preview.html
-
 *custom_plan_builder*.html
 backend/billing/custom_quote_templates.py
-backend/templates/broadcasts/
-backend/templates/help/
-backend/templates/emails/billing/custom_quote_*.html
-backend/templates/emails/billing/owner_quote_alert.html
-admin_custom_plan_builder.html
+backend/templates/
+templates/
+templates/**
+backend/templates/**
+lead-hunter-welcome-email.html
+.agents

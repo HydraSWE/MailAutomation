@@ -778,3 +778,54 @@ def deliver_custom_workspace_ready_email(quote: Any) -> None:
     )
     send_system_email(subject, body, quote.customer_email, html=html, sender="general")
 
+
+def deliver_lead_hunter_plus_welcome_email(user_email: str, plan_name: str = "Pro") -> None:
+    """
+    Sends the official Lead Hunter PLUS companion onboarding email to paid subscribers.
+    """
+    subject = "Welcome to Mail Flow Plus — Get Your Lead Hunter Chrome Extension! 🚀"
+    body = (
+        f"Hello,\n\n"
+        f"Thank you for subscribing to Mail Flow! As an active subscriber, you have unlocked complimentary access to the Mail Flow - Lead Hunter Chrome extension.\n\n"
+        f"How to activate:\n"
+        f"1. Install the extension from the Chrome Web Store.\n"
+        f"2. Open the extension popup and enter your Mail Flow account email: {user_email}\n"
+        f"3. Click Activate — your {plan_name} Lead Hunter access will immediately unlock!\n\n"
+        f"Best regards,\n"
+        f"The Mail Flow Team"
+    )
+    html = render_to_string(
+        "emails/billing/lead_hunter_welcome.html",
+        {
+            "user_email": user_email,
+            "plan_name": plan_name,
+            "chrome_store_url": getattr(settings, "LEAD_HUNTER_CHROME_STORE_URL", "https://chromewebstore.google.com"),
+        },
+    )
+    send_system_email(subject, body, user_email, html=html, sender="billing")
+
+
+def provision_lead_hunter_license(user_email: str, plan_name: str = "Pro", days: int = 30) -> bool:
+    """
+    Provisions or extends a Lead Hunter license via the cPanel relay.
+    """
+    relay_url = getattr(settings, "MAIL_FLOW_LEADHUNT_RELAY_URL", "https://mail.annomous.com/mailflow-leadhunt-relay.php")
+    relay_secret = getattr(settings, "MAIL_FLOW_LEADHUNT_RELAY_SECRET", getattr(settings, "MAIL_FLOW_OTP_RELAY_SECRET", ""))
+
+    try:
+        payload = {
+            "action": "provision",
+            "email": user_email.lower().strip(),
+            "plan": plan_name,
+            "days": days,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Mail-Flow-Secret": relay_secret,
+        }
+        resp = requests.post(relay_url, json=payload, headers=headers, timeout=10)
+        return resp.status_code == 200 and resp.json().get("ok", False)
+    except Exception:
+        return False
+
+

@@ -1,43 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
 import {
   Sliders,
   Mail,
   Shield,
   Users,
   User,
-  Save,
-  Plus,
-  Edit2,
-  Trash,
-  CheckCircle2,
-  Key,
-  UserX,
-  UserCheck,
-  LogOut,
-  ShieldCheck,
-  KeyRound,
-  QrCode,
-  Copy,
-  Download,
-  ShieldOff,
-  RefreshCcw,
-  Loader2,
-  X,
-  AlertTriangle,
-  Info,
 } from "lucide-react";
-import settingsApi from "../../../services/settingsApi";
-import usersApi from "../../../services/usersApi";
-import twoFactorApi from "../../../services/twoFactorApi";
-import DataTable from "../../../components/common/DataTable";
-import FormModal from "../../../components/common/FormModal";
-import ConfirmDialog from "../../../components/common/ConfirmDialog";
-import CustomSelect from "../../../components/common/CustomSelect";
-import { useModal } from "../../../hooks/useModal";
-import { useToast } from "../../../hooks/useToast";
-import { getUser, setUser as updateStoredUser } from "../../../utils/auth";
-import { apiError } from "../../../utils/apiError";
 import GeneralSettingsTab from "./GeneralSettingsTab";
 import EmailSettingsTab from "./EmailSettingsTab";
 import SecuritySettingsTab from "./SecuritySettingsTab";
@@ -46,17 +14,22 @@ import ProfileSettingsTab from "./ProfileSettingsTab";
 import TwoFactorDialogs from "./TwoFactorDialogs";
 import { useSettingsWorkspace } from "./useSettingsWorkspace";
 
+
 export default function SettingsPage() {
   const {
     toast, activeTab, setActiveTab, saving, settings, setSettings, users, usersLoading,
     userModal, deleteUserModal, passwordResetModal, userData, setUserData, resetPassword,
-    setResetPassword, seatUsage, profile, setProfile, twoFAStatus, showSetup2FA,
-    setShowSetup2FA, setup2FAData, setup2FAStep, setSetup2FAStep, setup2FACode,
-    setSetup2FACode, setup2FABackupCodes, setup2FALoading, showDisable2FA,
+    setResetPassword, seatUsage, profile, setProfile, profileSaving, handleSaveProfile,
+    passwordForm, setPasswordForm, passwordSaving, handleUpdatePassword,
+    showEmailModal, setShowEmailModal, emailStep, setEmailStep, newEmail, setNewEmail,
+    emailPassword, setEmailPassword, emailOtp, setEmailOtp, emailLoading,
+    handleOpenEmailModal, handleRequestEmailChange, handleConfirmEmailChange,
+    twoFAStatus, showSetup2FA, setShowSetup2FA, setup2FAData, setup2FAStep, setSetup2FAStep,
+    setup2FACode, setSetup2FACode, setup2FABackupCodes, setup2FALoading, showDisable2FA,
     setShowDisable2FA, disable2FAPassword, setDisable2FAPassword, showRegenCodes,
     setShowRegenCodes, regenPassword, setRegenPassword, regenCodes, setRegenCodes,
     twoFALoading, handleSaveSettings, handleSaveUser, handleDeleteUser,
-    handleResetPassword, handleSaveProfile, handleStart2FASetup, handleConfirm2FA,
+    handleResetPassword, handleStart2FASetup, handleConfirm2FA,
     handleDisable2FA, handleRegenBackupCodes, copyBackupCodes, downloadBackupCodes, userColumns,
   } = useSettingsWorkspace();
 
@@ -110,7 +83,40 @@ export default function SettingsPage() {
       {activeTab === "users" && <UsersRolesTab users={users} usersLoading={usersLoading} seatUsage={seatUsage} userColumns={userColumns} userModal={userModal} userData={userData} setUserData={setUserData} onSaveUser={handleSaveUser} passwordResetModal={passwordResetModal} resetPassword={resetPassword} setResetPassword={setResetPassword} onResetPassword={handleResetPassword} deleteUserModal={deleteUserModal} onDeleteUser={handleDeleteUser} />}
 
       {/* Tab 6: Profile Settings */}
-      {activeTab === "profile" && <ProfileSettingsTab profile={profile} setProfile={setProfile} onSaveProfile={handleSaveProfile} twoFAStatus={twoFAStatus} onStart2FASetup={handleStart2FASetup} setup2FALoading={setup2FALoading} setShowRegenCodes={setShowRegenCodes} setRegenPassword={setRegenPassword} setRegenCodes={setRegenCodes} setShowDisable2FA={setShowDisable2FA} setDisable2FAPassword={setDisable2FAPassword} />}
+      {activeTab === "profile" && (
+        <ProfileSettingsTab
+          profile={profile}
+          setProfile={setProfile}
+          profileSaving={profileSaving}
+          onSaveProfile={handleSaveProfile}
+          passwordForm={passwordForm}
+          setPasswordForm={setPasswordForm}
+          passwordSaving={passwordSaving}
+          onUpdatePassword={handleUpdatePassword}
+          showEmailModal={showEmailModal}
+          setShowEmailModal={setShowEmailModal}
+          emailStep={emailStep}
+          setEmailStep={setEmailStep}
+          newEmail={newEmail}
+          setNewEmail={setNewEmail}
+          emailPassword={emailPassword}
+          setEmailPassword={setEmailPassword}
+          emailOtp={emailOtp}
+          setEmailOtp={setEmailOtp}
+          emailLoading={emailLoading}
+          onOpenEmailModal={handleOpenEmailModal}
+          onRequestEmailChange={handleRequestEmailChange}
+          onConfirmEmailChange={handleConfirmEmailChange}
+          twoFAStatus={twoFAStatus}
+          onStart2FASetup={handleStart2FASetup}
+          setup2FALoading={setup2FALoading}
+          setShowRegenCodes={setShowRegenCodes}
+          setRegenPassword={setRegenPassword}
+          setRegenCodes={setRegenCodes}
+          setShowDisable2FA={setShowDisable2FA}
+          setDisable2FAPassword={setDisable2FAPassword}
+        />
+      )}
 
       <TwoFactorDialogs showSetup2FA={showSetup2FA} setup2FAData={setup2FAData} setShowSetup2FA={setShowSetup2FA} setup2FAStep={setup2FAStep} setSetup2FAStep={setSetup2FAStep} setup2FACode={setup2FACode} setSetup2FACode={setSetup2FACode} onConfirm2FA={handleConfirm2FA} setup2FALoading={setup2FALoading} setup2FABackupCodes={setup2FABackupCodes} copyBackupCodes={copyBackupCodes} downloadBackupCodes={downloadBackupCodes} toast={toast} showDisable2FA={showDisable2FA} setShowDisable2FA={setShowDisable2FA} disable2FAPassword={disable2FAPassword} setDisable2FAPassword={setDisable2FAPassword} onDisable2FA={handleDisable2FA} twoFALoading={twoFALoading} showRegenCodes={showRegenCodes} setShowRegenCodes={setShowRegenCodes} regenCodes={regenCodes} regenPassword={regenPassword} setRegenPassword={setRegenPassword} onRegenBackupCodes={handleRegenBackupCodes} />
     </div>

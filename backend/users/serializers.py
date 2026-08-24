@@ -316,12 +316,43 @@ class ProfileSerializer(serializers.ModelSerializer):
             "two_factor_enabled", "two_factor_backup_count",
         )
         read_only_fields = (
-            "id", "username", "role", "organization", "organization_name",
+            "id", "username", "email", "role", "organization", "organization_name",
             "two_factor_enabled", "two_factor_backup_count",
         )
 
     def get_two_factor_backup_count(self, obj):
         return len(obj.two_factor_backup_codes or [])
+
+
+class RequestEmailChangeSerializer(serializers.Serializer):
+    new_email = serializers.EmailField()
+    current_password = serializers.CharField(write_only=True)
+
+    def validate_new_email(self, value):
+        value = value.strip().lower()
+        user = self.context["request"].user
+        if user.email and value == user.email.lower():
+            raise serializers.ValidationError("New email cannot be the same as your current email.")
+        if User.objects.filter(email__iexact=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("An account with this email address already exists.")
+        return value
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+
+class ConfirmEmailChangeSerializer(serializers.Serializer):
+    request_id = serializers.UUIDField()
+    code = serializers.CharField(max_length=10)
+
+    def validate_code(self, value):
+        val = value.strip()
+        if len(val) != 6 or not val.isdigit():
+            raise serializers.ValidationError("Enter a valid 6-digit verification code.")
+        return val
 
 
 class UserLoginSessionSerializer(serializers.ModelSerializer):

@@ -9,6 +9,7 @@ from .emails import (
     build_html_shell,
     deliver_account_created_email,
     deliver_checkout_otp_email,
+    deliver_email_change_otp,
     deliver_invoice_email,
     deliver_manual_review_email,
     deliver_payment_confirmation_email,
@@ -53,6 +54,13 @@ def _record_delivery(invoice_id: int, sent_field: str, error_field: str, *, erro
 def send_checkout_otp_email(email: str, code: str) -> str:
     deliver_checkout_otp_email(email, code)
     return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_email_change_otp_email(email: str, code: str) -> str:
+    deliver_email_change_otp(email, code)
+    return "sent"
+
 
 
 @shared_task(**EMAIL_TASK_OPTIONS)

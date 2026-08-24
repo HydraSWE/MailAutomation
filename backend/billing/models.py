@@ -93,7 +93,7 @@ class PaymentInvoice(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="invoices")
-    organization = models.ForeignKey("common.Organization", null=True, blank=True, on_delete=models.PROTECT, related_name="payment_invoices")
+    organization = models.ForeignKey("common.Organization", null=True, blank=True, on_delete=models.SET_NULL, related_name="payment_invoices")
     customer_name = models.CharField(max_length=150)
     customer_email = models.EmailField()
     organization_name = models.CharField(max_length=255)

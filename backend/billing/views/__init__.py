@@ -9,6 +9,7 @@ from .custom_activation import (
     CustomActivationVerifyOtpView,
 )
 from .custom_quotes import (
+    AccountCustomQuoteView,
     CustomQuoteOtpRequestView,
     CustomQuoteOtpVerifyView,
     CustomQuoteSubmitView,

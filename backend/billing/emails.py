@@ -226,6 +226,33 @@ def deliver_checkout_otp_email(email: str, code: str) -> None:
     send_system_email(subject, body, email, html, sender="billing")
 
 
+def deliver_email_change_otp(email: str, code: str) -> None:
+    subject = "Verify your new Mail Flow email address"
+    body = (
+        f"Your verification code to update your Mail Flow account email is: {code}\n\n"
+        "This code will expire in 10 minutes.\n"
+        "If you did not initiate this change, please ensure your account password is secure."
+    )
+    custom_content = (
+        "<div style=\"background-color:#0B0F17;border:1px solid #1E293B;border-radius:10px;padding:22px;text-align:center;margin:20px 0;box-shadow:inset 0 2px 4px rgba(0,0,0,0.4);\">"
+        "<div style=\"font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;\">Email Verification Code</div>"
+        f"<div style=\"font-size:34px;font-weight:800;letter-spacing:8px;color:#38BDF8;font-family:monospace;text-shadow:0 0 16px rgba(56,189,248,0.25);\">{escape(code)}</div>"
+        "<div style=\"font-size:12px;color:#64748B;margin-top:8px;\">Expires in 10 minutes</div>"
+        "</div>"
+    )
+    html = build_html_shell(
+        "Email Change Verification",
+        "Please use the verification code below to confirm updating your account email on Mail Flow.",
+        rows=None,
+        custom_content=custom_content,
+        badge="Security Verification",
+        footer_note="Never share your verification code with anyone. Mail Flow staff will never ask for this code.",
+        template_name="emails/billing/checkout_otp.html",
+    )
+    send_system_email(subject, body, email, html, sender="billing")
+
+
+
 def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) -> None:
     link = invoice_link(invoice)
     purpose = "Resume your USDT payment" if recovery else "Your USDT invoice is ready"

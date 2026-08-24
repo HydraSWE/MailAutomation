@@ -20,10 +20,12 @@ from common.models import SystemSetting
 from common.permissions import OwnerOrAdmin
 from common.tenancy import is_owner, scope_queryset
 from common.utils import get_client_ip
-from ..models import User, UserLoginSession
+from ..models import EmailChangeRequest, User, UserLoginSession
 from ..serializers import (
+    ConfirmEmailChangeSerializer,
     CustomTokenObtainPairSerializer,
     ProfileSerializer,
+    RequestEmailChangeSerializer,
     SessionTokenRefreshSerializer,
     SystemSettingSerializer,
     UserLoginSessionSerializer,

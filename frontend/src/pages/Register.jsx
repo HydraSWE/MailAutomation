@@ -33,6 +33,7 @@ export default function Register() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [accountExistsError, setAccountExistsError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -87,11 +88,16 @@ export default function Register() {
       ...current,
       [e.target.name]: e.target.value,
     }));
+    if (e.target.name === "email") {
+      setAccountExistsError(null);
+      setError("");
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setAccountExistsError(null);
     setSubmitting(true);
 
     try {
@@ -125,7 +131,16 @@ export default function Register() {
         navigate("/login?created=1", { replace: true });
       }
     } catch (err) {
-      setError(apiError(err));
+      const errData = err?.response?.data;
+      if (errData?.code === "ACCOUNT_EXISTS") {
+        setAccountExistsError({
+          detail: errData.detail,
+          masked_org: errData.masked_org,
+          login_url: errData.login_url || `/login?email=${encodeURIComponent(form.email)}`,
+        });
+      } else {
+        setError(apiError(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -179,12 +194,42 @@ export default function Register() {
             </div>
 
             {/* Error banner */}
-            {error && (
+            {accountExistsError ? (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/40 text-amber-200 rounded-2xl text-xs sm:text-sm animate-fade-in space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="p-1 rounded-lg bg-amber-500/20 text-amber-300 font-bold shrink-0">⚠️</span>
+                  <div>
+                    <h3 className="font-bold text-amber-100 text-sm">Account Already Exists</h3>
+                    <p className="text-xs text-amber-200/90 mt-1">
+                      This email is already associated with an account connected to workspace <strong className="text-white font-semibold">{accountExistsError.masked_org}</strong>.
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      To access or manage your workspace, please sign in.
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-1 flex items-center gap-3">
+                  <Link
+                    to={accountExistsError.login_url}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-lg shadow-amber-950/40 transition"
+                  >
+                    Sign in to your account
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setAccountExistsError(null)}
+                    className="text-xs text-slate-400 hover:text-slate-200 underline"
+                  >
+                    Use another email
+                  </button>
+                </div>
+              </div>
+            ) : error ? (
               <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-2xl text-xs sm:text-sm animate-fade-in flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0" />
                 <div className="flex-1">{error}</div>
               </div>
-            )}
+            ) : null}
 
             {/* Registration Form */}
             <form onSubmit={handleSubmit} className="space-y-4">

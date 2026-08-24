@@ -2,7 +2,13 @@
 
 from .authentication import CustomTokenObtainPairView, CustomTokenRefreshView, LogoutView
 from .management import UserViewSet
-from .profile import ChangePasswordView, ProfileView, SettingsView
+from .profile import (
+    ChangePasswordView,
+    ConfirmEmailChangeView,
+    ProfileView,
+    RequestEmailChangeView,
+    SettingsView,
+)
 from .sessions import SessionViewSet
 from .two_factor import (
     TwoFactorBackupCodesView,

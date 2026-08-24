@@ -6,6 +6,8 @@ export const settingsApi = {
 
   getProfile: () => apiClient.get("/profile/"),
   updateProfile: (data) => apiClient.patch("/profile/", data),
+  requestEmailChange: (data) => apiClient.post("/profile/request-email-change/", data),
+  confirmEmailChange: (data) => apiClient.post("/profile/confirm-email-change/", data),
   changePassword: (data) => apiClient.post("/profile/change-password/", data),
 };
 

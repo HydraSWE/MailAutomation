@@ -354,6 +354,11 @@ class CustomQuoteSubmitSerializer(serializers.Serializer):
     requested_limits = serializers.DictField()
 
 
+class AccountCustomQuoteSubmitSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    requested_limits = serializers.DictField()
+
+
 from .models import CustomPlanQuote, EmailVerification
 
 

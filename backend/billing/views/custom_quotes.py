@@ -1,16 +1,19 @@
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from ..serializers import (
+    AccountCustomQuoteSubmitSerializer,
     CustomPlanQuoteSerializer,
     CustomQuoteOtpRequestSerializer,
     CustomQuoteOtpVerifySerializer,
     CustomQuoteSubmitSerializer,
 )
 from ..services.custom_quotes import (
+    get_organization_active_quote,
     request_quote_otp,
+    submit_authenticated_account_quote,
     submit_custom_quote,
     verify_quote_otp,
 )
@@ -78,3 +81,37 @@ class CustomQuoteSubmitView(CsrfProtectedAPIView):
             CustomPlanQuoteSerializer(quote).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class AccountCustomQuoteView(CsrfProtectedAPIView):
+    """Allows authenticated organization administrators to check and submit enterprise custom quotes."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "public_signup"
+
+    def get(self, request):
+        if getattr(request.user, "role", None) != "admin" or not getattr(request.user, "organization_id", None):
+            return Response({"detail": "Only an organization administrator can view custom quotes."}, status=status.HTTP_403_FORBIDDEN)
+        
+        quote = get_organization_active_quote(request.user.organization)
+        return Response({
+            "quote": CustomPlanQuoteSerializer(quote).data if quote else None,
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if getattr(request.user, "role", None) != "admin" or not getattr(request.user, "organization_id", None):
+            return Response({"detail": "Only an organization administrator can submit custom quotes."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = AccountCustomQuoteSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        quote = submit_authenticated_account_quote(
+            user=request.user,
+            requested_limits=serializer.validated_data["requested_limits"],
+            notes=serializer.validated_data.get("notes", ""),
+            request=request,
+        )
+        return Response(
+            CustomPlanQuoteSerializer(quote).data,
+            status=status.HTTP_201_CREATED,
+        )
+

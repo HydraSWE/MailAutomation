@@ -12,6 +12,7 @@ from ..models import CustomPlanQuote, EmailVerification, Plan
 from .common import (
     PREMIUM_PLUS_PLAN_SLUG,
     audit_event,
+    check_account_available_for_signup,
     normalized_email,
     normalized_org_name,
 )
@@ -65,6 +66,7 @@ def request_quote_otp(email: str, turnstile_token: str, request=None) -> tuple[E
     if not email or "@" not in email:
         raise ValidationError({"email": "Enter a valid email address."})
     verify_turnstile(turnstile_token, request)
+    check_account_available_for_signup(email)
 
     norm_email = normalized_email(email)
     raw_otp = f"{secrets.randbelow(1_000_000):06d}"
@@ -152,6 +154,8 @@ def submit_custom_quote(
     if not organization_name:
         raise ValidationError({"organization_name": "Organization name is required."})
 
+    check_account_available_for_signup(verification.email, organization_name)
+
     clean_limits = sanitize_custom_limits(requested_limits)
     quote_number = generate_quote_number()
     norm_email = verification.normalized_email
@@ -186,3 +190,87 @@ def submit_custom_quote(
     transaction.on_commit(lambda: cast(Any, send_custom_quote_received_email).delay(str(quote.id)))
     transaction.on_commit(lambda: cast(Any, send_owner_quote_alert_email).delay(str(quote.id)))
     return quote
+
+
+def get_organization_active_quote(organization) -> CustomPlanQuote | None:
+    """Retrieve the latest actionable quote for an organization."""
+    if not organization:
+        return None
+    return (
+        CustomPlanQuote.objects.filter(
+            activated_organization=organization,
+            status__in=[
+                CustomPlanQuote.Status.PENDING_REVIEW,
+                CustomPlanQuote.Status.INVOICED,
+                CustomPlanQuote.Status.REJECTED,
+            ],
+        )
+        .select_related("invoice", "invoice__plan")
+        .order_by("-created_at")
+        .first()
+    )
+
+
+@transaction.atomic
+def submit_authenticated_account_quote(
+    *,
+    user,
+    requested_limits: dict[str, Any],
+    notes: str = "",
+    request=None,
+) -> CustomPlanQuote:
+    """Allow an authenticated organization administrator to submit an enterprise quote without email OTP."""
+    if not user or not user.is_authenticated or getattr(user, "role", None) != "admin" or not getattr(user, "organization_id", None):
+        raise ValidationError({"detail": "Only an organization administrator can submit a custom quote."})
+
+    org = user.organization
+
+    # Anti-spam: check if active pending or valid invoiced quote exists
+    active_quote = (
+        CustomPlanQuote.objects.select_for_update()
+        .filter(
+            activated_organization=org,
+            status__in=[CustomPlanQuote.Status.PENDING_REVIEW, CustomPlanQuote.Status.INVOICED],
+        )
+        .first()
+    )
+
+    if active_quote:
+        if active_quote.status == CustomPlanQuote.Status.PENDING_REVIEW:
+            raise ValidationError({"detail": f"Your organization already has a quote ({active_quote.quote_number}) pending review."})
+        elif active_quote.status == CustomPlanQuote.Status.INVOICED and active_quote.invoice and not active_quote.invoice.is_expired():
+            raise ValidationError({"detail": f"Your organization already has an approved invoice ({active_quote.quote_number}) awaiting payment."})
+
+    clean_limits = sanitize_custom_limits(requested_limits)
+    quote_number = generate_quote_number()
+    clean_notes = (notes or "").strip()[:1000]
+
+    quote = CustomPlanQuote.objects.create(
+        quote_number=quote_number,
+        customer_name=(user.get_full_name() or user.username or "").strip(),
+        customer_email=user.email,
+        normalized_customer_email=normalized_email(user.email),
+        organization_name=org.name,
+        normalized_organization_name=normalized_org_name(org.name),
+        notes=clean_notes,
+        initial_email_verified_at=timezone.now(),
+        requested_limits=clean_limits,
+        approved_limits=clean_limits,
+        status=CustomPlanQuote.Status.PENDING_REVIEW,
+        activated_organization=org,
+        activated_user=user,
+    )
+
+    audit_event(
+        "account_custom_quote_submitted",
+        quote=quote,
+        request=request,
+        metadata={"quote_number": quote_number, "limits": clean_limits, "organization_id": str(org.id)},
+    )
+
+    from ..tasks import send_custom_quote_received_email, send_owner_quote_alert_email
+
+    transaction.on_commit(lambda: cast(Any, send_custom_quote_received_email).delay(str(quote.id)))
+    transaction.on_commit(lambda: cast(Any, send_owner_quote_alert_email).delay(str(quote.id)))
+    return quote
+

@@ -182,9 +182,16 @@ export default function Subscribe() {
     requestAnimationFrame(() => verificationTriggerRef.current?.focus());
   }
 
+  const [accountExistsError, setAccountExistsError] = useState(null);
+
   const update = (event) => {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
-    if (event.target.name === "email") { setEmailVerified(false); resetVerificationAttempt(); }
+    if (event.target.name === "email") {
+      setEmailVerified(false);
+      setAccountExistsError(null);
+      setError("");
+      resetVerificationAttempt();
+    }
   };
 
   async function requestCode(email = form.email) {
@@ -196,6 +203,8 @@ export default function Subscribe() {
     }
     setVerificationBusy("request");
     setVerificationError("");
+    setAccountExistsError(null);
+    setError("");
     try {
       await startCheckoutEmail(email, turnstileToken);
       setOtpSent(true);
@@ -204,6 +213,16 @@ export default function Subscribe() {
       resetTurnstile();
       deliveryTimerRef.current = setTimeout(() => { setDeliveryWaiting(false); deliveryTimerRef.current = null; }, 10000);
     } catch (err) {
+      const errData = err?.response?.data;
+      if (errData?.code === "ACCOUNT_EXISTS") {
+        setAccountExistsError({
+          detail: errData.detail,
+          masked_org: errData.masked_org,
+          login_url: errData.login_url || `/login?email=${encodeURIComponent(email)}`,
+        });
+      } else {
+        setError(apiError(err));
+      }
       setVerificationError(apiError(err));
       resetTurnstile();
     } finally { setVerificationBusy(""); }
@@ -263,7 +282,39 @@ export default function Subscribe() {
         </aside>
         <section className="p-7 sm:p-10">
           <h2 className="text-2xl font-black">Create your workspace</h2><p className="text-sm text-slate-500 mt-2">The first account becomes your organization administrator.</p>
-          {error && <div className="mt-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">{error}</div>}
+          {accountExistsError ? (
+            <div className="mt-5 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm text-amber-200 space-y-3">
+              <div className="flex items-start gap-3">
+                <span className="p-1 rounded-lg bg-amber-500/20 text-amber-300 font-bold shrink-0">⚠️</span>
+                <div>
+                  <h3 className="font-bold text-amber-100 text-base">Account Already Exists</h3>
+                  <p className="text-xs text-amber-200/90 mt-1">
+                    This email is already associated with an account connected to workspace <strong className="text-white font-semibold">{accountExistsError.masked_org}</strong>.
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    To upgrade your existing workspace or manage subscriptions, please sign in.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2 flex items-center gap-3">
+                <Link
+                  to={accountExistsError.login_url}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-lg shadow-amber-950/40 transition"
+                >
+                  Sign in to your account
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setAccountExistsError(null)}
+                  className="text-xs text-slate-400 hover:text-slate-200 underline"
+                >
+                  Use a different email
+                </button>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="mt-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">{error}</div>
+          ) : null}
           <form onSubmit={submit} className="mt-7 space-y-5">
             <div className="grid sm:grid-cols-2 gap-4"><Field label="Your name" name="name" autoComplete="name" value={form.name} onChange={update} /><Field label="Work email" name="email" type="email" autoComplete="email" value={form.email} onChange={update} /></div>
             <Field label="Organization name" name="organization_name" autoComplete="organization" value={form.organization_name} onChange={update} />

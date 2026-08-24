@@ -38,6 +38,7 @@ def send_checkout_otp(email, code):
 def start_checkout_email_verification(email, turnstile_token, *, request=None):
     verify_turnstile(turnstile_token, request)
     email = normalized_email(email)
+    check_account_available_for_signup(email)
     code = f"{secrets.randbelow(1_000_000):06d}"
     CheckoutEmailVerification.objects.filter(
         normalized_email=email, used_at__isnull=True, expires_at__gt=timezone.now(),

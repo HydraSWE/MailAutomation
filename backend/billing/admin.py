@@ -51,7 +51,7 @@ class PaymentInvoiceAdmin(admin.ModelAdmin):
         return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return bool(request.user and request.user.is_superuser)
 
 
 @admin.register(PaymentTransferLedger)
@@ -71,7 +71,7 @@ class PaymentTransferLedgerAdmin(admin.ModelAdmin):
         return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return bool(request.user and request.user.is_superuser)
 
 
 @admin.register(CheckoutSession)
@@ -95,7 +95,7 @@ class InvoiceAccessCodeAdmin(admin.ModelAdmin):
         return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return bool(request.user and request.user.is_superuser)
 
 
 @admin.register(PaymentSecurityAuditEvent)
@@ -123,7 +123,7 @@ class BillingReminderDeliveryAdmin(admin.ModelAdmin):
         return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return bool(request.user and request.user.is_superuser)
 
 
 admin.site.register(FreePlanClaim)

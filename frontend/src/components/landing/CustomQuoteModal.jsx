@@ -15,7 +15,7 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
   const [otp, setOtp] = useState("");
   const [verificationId, setVerificationId] = useState("");
   const [submittedQuote, setSubmittedQuote] = useState(null);
-
+  const [accountExistsError, setAccountExistsError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -29,6 +29,7 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
     if (!isOpen) {
       setStep(1);
       setError("");
+      setAccountExistsError(null);
       setOtp("");
       setVerificationId("");
       setSubmittedQuote(null);
@@ -97,6 +98,7 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
   async function handleSendOtp(e) {
     e?.preventDefault();
     setError("");
+    setAccountExistsError(null);
     if (!customerName.trim()) return setError("Please enter your full name.");
     if (!organizationName.trim()) return setError("Please enter your organization name.");
     if (!email.trim() || !email.includes("@")) return setError("Please enter a valid work email.");
@@ -112,7 +114,16 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
       setVerificationId(res.verification_id);
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.email || err?.response?.data?.detail || "Failed to send verification code.");
+      const errData = err?.response?.data;
+      if (errData?.code === "ACCOUNT_EXISTS") {
+        setAccountExistsError({
+          detail: errData.detail,
+          masked_org: errData.masked_org,
+          login_url: errData.login_url || `/login?email=${encodeURIComponent(email)}`,
+        });
+      } else {
+        setError(errData?.email || errData?.detail || errData?.organization_name || "Failed to send verification code.");
+      }
       setTurnstileToken("");
       setTurnstileRenderKey((k) => k + 1);
     } finally {
@@ -257,11 +268,41 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
                 )}
               </div>
 
-              {error && (
+              {accountExistsError ? (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200 space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <span className="font-bold text-amber-300">⚠️</span>
+                    <div>
+                      <strong className="block text-amber-100 font-bold text-sm">Account Already Exists</strong>
+                      <p className="mt-1 text-amber-200/90 leading-relaxed">
+                        This email is already associated with workspace <strong className="text-white">{accountExistsError.masked_org}</strong>.
+                      </p>
+                      <p className="mt-1 text-slate-400">
+                        To request custom quotas or modify plan limits, please sign in to your dashboard.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pt-2 flex items-center gap-3">
+                    <a
+                      href={accountExistsError.login_url}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 transition"
+                    >
+                      Sign in to workspace
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setAccountExistsError(null)}
+                      className="text-xs text-slate-400 hover:text-slate-200 underline"
+                    >
+                      Use another email
+                    </button>
+                  </div>
+                </div>
+              ) : error ? (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 font-medium">
                   {error}
                 </div>
-              )}
+              ) : null}
 
               <button
                 type="submit"

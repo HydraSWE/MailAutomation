@@ -116,5 +116,41 @@ def audit_event(event_type, *, invoice=None, quote=None, ledger=None, actor=None
 
 
 
+def mask_organization_name(org_name: str) -> str:
+    if not org_name:
+        return "an existing workspace"
+    clean = org_name.strip()
+    if len(clean) <= 3:
+        return f"{clean[0]}***"
+    return f"{clean[:2]}***{clean[-2:]}"
+
+
+def check_account_available_for_signup(email: str, org_name: str | None = None):
+    norm = normalized_email(email)
+    existing_user = (
+        User.objects.filter(email__iexact=norm)
+        .select_related("organization")
+        .first()
+    )
+    if existing_user:
+        org_title = existing_user.organization.name if existing_user.organization else None
+        masked_org = mask_organization_name(org_title) if org_title else "an existing workspace"
+        raise ValidationError({
+            "detail": f"An account with this email already exists and is connected to '{masked_org}'. Please sign in to your dashboard to change plans or request higher quotas.",
+            "code": "ACCOUNT_EXISTS",
+            "masked_org": masked_org,
+            "login_url": f"/login?email={norm}",
+        })
+
+    if org_name and org_name.strip():
+        clean_org = org_name.strip()
+        if Organization.objects.filter(name__iexact=clean_org).exists():
+            raise ValidationError({
+                "organization_name": "An organization with this name already exists. Please choose a unique organization name.",
+                "detail": "An organization with this name already exists. Please choose a unique organization name.",
+                "code": "ORG_EXISTS",
+            })
+
+
 __all__ = [name for name in globals() if not name.startswith('__')]
 

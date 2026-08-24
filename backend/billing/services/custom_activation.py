@@ -204,24 +204,33 @@ def complete_custom_activation(
     candidate_user = User(email=quote.customer_email, name=name, username=username or "admin")
     validate_password(password, user=candidate_user)
 
-    # 1. Create Organization
+    # 1. Check User Anti-Hijacking Guard
+    existing_user = User.objects.filter(email__iexact=quote.customer_email).first()
+    if existing_user and existing_user.organization_id:
+        raise ValidationError({"detail": "This email is already connected to an active workspace. You cannot overwrite this account with a new organization."})
+
+    # 2. Create Organization (safeguard against collisions)
+    clean_org_name = quote.organization_name.strip()
+    if Organization.objects.filter(name__iexact=clean_org_name).exists():
+        raise ValidationError({"detail": f"An organization named '{quote.organization_name}' already exists. Please contact support."})
+
     organization = Organization.objects.create(name=quote.organization_name)
     snapshot_limits = quote.invoice.snapshot_limits or quote.approved_limits
     apply_custom_limits_to_organization(organization, snapshot_limits, activate=True)
 
-    # 2. Create or Update Admin User
-    user = User.objects.filter(email__iexact=quote.customer_email).first()
-    if user:
-        if username and username.lower() != user.username.lower():
-            if User.objects.filter(username__iexact=username).exclude(pk=user.pk).exists():
+    # 3. Create or Link Admin User
+    if existing_user:
+        if username and username.lower() != existing_user.username.lower():
+            if User.objects.filter(username__iexact=username).exclude(pk=existing_user.pk).exists():
                 raise ValidationError({"username": "This username is already taken. Please choose another."})
-            user.username = username
-        user.name = name or user.name
-        user.first_name = name or user.first_name
-        user.role = User.Role.ADMIN
-        user.organization = organization
-        user.set_password(password)
-        user.save()
+            existing_user.username = username
+        existing_user.name = name or existing_user.name
+        existing_user.first_name = name or existing_user.first_name
+        existing_user.role = User.Role.ADMIN
+        existing_user.organization = organization
+        existing_user.set_password(password)
+        existing_user.save()
+        user = existing_user
     else:
         if username:
             if User.objects.filter(username__iexact=username).exists():

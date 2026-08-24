@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Edit2, Key, LogOut, ShieldOff, Trash, UserCheck, UserX } from "lucide-react";
 import settingsApi from "../../../services/settingsApi";
 import usersApi from "../../../services/usersApi";
 import twoFactorApi from "../../../services/twoFactorApi";
 import { useModal } from "../../../hooks/useModal";
 import { useToast } from "../../../hooks/useToast";
-import { getUser, setUser as updateStoredUser } from "../../../utils/auth";
+import { clearTokens, getUser, setUser as updateStoredUser } from "../../../utils/auth";
 import { apiError } from "../../../utils/apiError";
 
 export function useSettingsWorkspace() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const currentUser = getUser();
 
@@ -64,13 +66,29 @@ export function useSettingsWorkspace() {
 
   // Profile State
   const [profile, setProfile] = useState({
-    name: currentUser?.username || "Admin",
+    name: currentUser?.name || currentUser?.username || "Admin",
     email: currentUser?.email || "admin@example.com",
-    phone: "+1 (555) 123-4567",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  // Password State
+  const [passwordForm, setPasswordForm] = useState({
     current_password: "",
     new_password: "",
     confirm_password: "",
   });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  // Email Change State
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailStep, setEmailStep] = useState(1); // 1 = form, 2 = otp
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailRequestId, setEmailRequestId] = useState("");
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailExpiresAt, setEmailExpiresAt] = useState(null);
+
 
   // 2FA State
   const [twoFAStatus, setTwoFAStatus] = useState({ enabled: false, backupCount: 0 });
@@ -244,25 +262,116 @@ export function useSettingsWorkspace() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (profile.new_password && profile.new_password !== profile.confirm_password) {
+    setProfileSaving(true);
+    try {
+      const res = await settingsApi.updateProfile({ name: profile.name });
+      updateStoredUser({ ...currentUser, name: res.data.name || profile.name });
+      toast.success("Profile details updated successfully!");
+    } catch (err) {
+      toast.error(apiError(err, "Failed to update profile."));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleOpenEmailModal = () => {
+    setShowEmailModal(true);
+    setEmailStep(1);
+    setNewEmail("");
+    setEmailPassword("");
+    setEmailOtp("");
+    setEmailRequestId("");
+    setEmailExpiresAt(null);
+  };
+
+  const handleRequestEmailChange = async (e) => {
+    e.preventDefault();
+    if (!newEmail || !emailPassword) {
+      toast.warning("Please enter your new email and current password.");
+      return;
+    }
+    setEmailLoading(true);
+    try {
+      const res = await settingsApi.requestEmailChange({
+        new_email: newEmail,
+        current_password: emailPassword,
+      });
+      setEmailRequestId(res.data.request_id);
+      setEmailExpiresAt(res.data.expires_at);
+      setEmailStep(2);
+      toast.success(res.data.detail || "Verification code sent to your new email!");
+    } catch (err) {
+      toast.error(apiError(err, "Failed to request email change."));
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleConfirmEmailChange = async (e) => {
+    e.preventDefault();
+    if (!emailOtp || emailOtp.trim().length !== 6) {
+      toast.warning("Please enter the 6-digit verification code.");
+      return;
+    }
+    setEmailLoading(true);
+    try {
+      const res = await settingsApi.confirmEmailChange({
+        request_id: emailRequestId,
+        code: emailOtp.trim(),
+      });
+      setProfile((prev) => ({ ...prev, email: res.data.profile?.email || newEmail }));
+      updateStoredUser({
+        ...currentUser,
+        email: res.data.profile?.email || newEmail,
+        username: res.data.profile?.username || currentUser.username,
+      });
+      toast.success(res.data.detail || "Email updated successfully!");
+      setShowEmailModal(false);
+      setEmailStep(1);
+      setNewEmail("");
+      setEmailPassword("");
+      setEmailOtp("");
+    } catch (err) {
+      toast.error(apiError(err, "Verification failed."));
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!passwordForm.current_password || !passwordForm.new_password) {
+      toast.warning("Please fill in all password fields.");
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
       toast.error("New password and confirmation do not match.");
       return;
     }
+    if (passwordForm.new_password.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
+      return;
+    }
 
+    setPasswordSaving(true);
     try {
-      await settingsApi.updateProfile({ name: profile.name, email: profile.email, phone: profile.phone });
-      if (profile.new_password) {
-        await settingsApi.changePassword({
-          current_password: profile.current_password,
-          new_password: profile.new_password,
-        });
-      }
-      updateStoredUser({ ...currentUser, username: profile.name, email: profile.email });
-      toast.success("User profile updated!");
-    } catch (_e) {
-      toast.success("Profile saved!");
+      await settingsApi.changePassword({
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
+      toast.success("Password changed successfully! Signing out to verify new password...");
+      setTimeout(() => {
+        clearTokens();
+        navigate("/login", { replace: true });
+      }, 1200);
+    } catch (err) {
+      toast.error(apiError(err, "Failed to change password."));
+    } finally {
+      setPasswordSaving(false);
     }
   };
+
 
   // ── 2FA Handlers ──────────────────────────────────────────────────
 
@@ -491,6 +600,78 @@ export function useSettingsWorkspace() {
   ];
 
 
-  return { toast, activeTab, setActiveTab, saving, settings, setSettings, users, usersLoading, userModal, deleteUserModal, passwordResetModal, userData, setUserData, resetPassword, setResetPassword, seatUsage, profile, setProfile, twoFAStatus, showSetup2FA, setShowSetup2FA, setup2FAData, setup2FAStep, setSetup2FAStep, setup2FACode, setSetup2FACode, setup2FABackupCodes, setup2FALoading, showDisable2FA, setShowDisable2FA, disable2FAPassword, setDisable2FAPassword, showRegenCodes, setShowRegenCodes, regenPassword, setRegenPassword, regenCodes, setRegenCodes, twoFALoading, handleSaveSettings, handleSaveUser, handleDeleteUser, handleResetPassword, handleSaveProfile, handleStart2FASetup, handleConfirm2FA, handleDisable2FA, handleRegenBackupCodes, copyBackupCodes, downloadBackupCodes, userColumns };
+  return {
+    toast,
+    activeTab,
+    setActiveTab,
+    saving,
+    settings,
+    setSettings,
+    users,
+    usersLoading,
+    userModal,
+    deleteUserModal,
+    passwordResetModal,
+    userData,
+    setUserData,
+    resetPassword,
+    setResetPassword,
+    seatUsage,
+    profile,
+    setProfile,
+    profileSaving,
+    handleSaveProfile,
+    passwordForm,
+    setPasswordForm,
+    passwordSaving,
+    handleUpdatePassword,
+    showEmailModal,
+    setShowEmailModal,
+    emailStep,
+    setEmailStep,
+    newEmail,
+    setNewEmail,
+    emailPassword,
+    setEmailPassword,
+    emailOtp,
+    setEmailOtp,
+    emailLoading,
+    handleOpenEmailModal,
+    handleRequestEmailChange,
+    handleConfirmEmailChange,
+    twoFAStatus,
+    showSetup2FA,
+    setShowSetup2FA,
+    setup2FAData,
+    setup2FAStep,
+    setSetup2FAStep,
+    setup2FACode,
+    setSetup2FACode,
+    setup2FABackupCodes,
+    setup2FALoading,
+    showDisable2FA,
+    setShowDisable2FA,
+    disable2FAPassword,
+    setDisable2FAPassword,
+    showRegenCodes,
+    setShowRegenCodes,
+    regenPassword,
+    setRegenPassword,
+    regenCodes,
+    setRegenCodes,
+    twoFALoading,
+    handleSaveSettings,
+    handleSaveUser,
+    handleDeleteUser,
+    handleResetPassword,
+    handleStart2FASetup,
+    handleConfirm2FA,
+    handleDisable2FA,
+    handleRegenBackupCodes,
+    copyBackupCodes,
+    downloadBackupCodes,
+    userColumns,
+  };
 }
+
 

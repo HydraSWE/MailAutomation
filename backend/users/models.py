@@ -1,3 +1,4 @@
+import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -14,7 +15,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.OPERATOR)
     organization = models.ForeignKey(
         "common.Organization",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="users",
         null=True,
         blank=True,
@@ -43,3 +44,19 @@ class UserLoginSession(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class EmailChangeRequest(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_change_requests")
+    new_email = models.EmailField()
+    code_digest = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=5)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+

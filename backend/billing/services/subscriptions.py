@@ -124,6 +124,7 @@ def _create_customer(invoice_or_data, plan):
 @transaction.atomic
 def provision_free_account(data, request):
     verify_turnstile(data.get("turnstile_token", ""), request)
+    check_account_available_for_signup(data["email"], data.get("organization_name"))
     ip_digest = private_hash(client_ip(request))
     email_digest = private_hash(data["email"])
     if FreePlanClaim.objects.filter(ip_hash=ip_digest).exists():

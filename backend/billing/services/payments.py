@@ -138,8 +138,22 @@ def fulfill_paid_invoice(invoice_id, transfer, *, manual_approval=False):
             ledger.save(update_fields=("invoice", "resolution", "resolution_history", "updated_at"))
     except IntegrityError as exc:
         raise ValidationError({"detail": "This blockchain transfer has already been used."})
+    from ..models import CustomPlanQuote
+
     invoice_obj = cast(Any, invoice)
-    if invoice_obj.organization_id:
+    quote = getattr(invoice, "custom_quote", None) or CustomPlanQuote.objects.filter(invoice=invoice).first()
+    if quote:
+        now = timezone.now()
+        raw_intent = secrets.token_urlsafe(32)
+        quote.activation_intent_digest = hashlib.sha256(raw_intent.encode()).hexdigest()
+        quote.activation_intent_created_at = now
+        quote.activation_intent_expires_at = now + timedelta(days=7)
+        quote.status = CustomPlanQuote.Status.ACTIVATION_PENDING
+        quote.save(update_fields=("activation_intent_digest", "activation_intent_created_at", "activation_intent_expires_at", "status", "updated_at"))
+
+        from ..tasks import send_custom_quote_payment_confirmed_email
+        transaction.on_commit(lambda: cast(Any, send_custom_quote_payment_confirmed_email).delay(str(quote.id), raw_intent))
+    elif invoice_obj.organization_id:
         organization = invoice_obj.organization
         if _is_custom_invoice(invoice_obj):
             apply_custom_limits_to_organization(organization, invoice_obj.snapshot_limits)
@@ -185,9 +199,10 @@ def fulfill_paid_invoice(invoice_id, transfer, *, manual_approval=False):
         invoice=invoice,
         ledger=ledger,
     )
-    from ..tasks import send_payment_confirmation_email
+    if not quote:
+        from ..tasks import send_payment_confirmation_email
 
-    transaction.on_commit(lambda: cast(Any, send_payment_confirmation_email).delay(str(invoice.pk)))
+        transaction.on_commit(lambda: cast(Any, send_payment_confirmation_email).delay(str(invoice.pk)))
     return invoice
-### This iss nothing
+
 

@@ -72,7 +72,7 @@ def revoke_invoice_access(invoice):
 def invoice_resume_url(invoice, token=None):
     path = f"/payment/{invoice.pk}"
     frontend = getattr(settings, "FRONTEND_URL", "").rstrip("/")
-    suffix = f"#code={quote(token)}" if token else ""
+    suffix = f"?code={quote(token)}" if token else ""
     return f"{frontend}{path}{suffix}" if frontend else f"{path}{suffix}"
 
 

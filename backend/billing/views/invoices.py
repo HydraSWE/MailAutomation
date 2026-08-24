@@ -198,13 +198,15 @@ class InvoiceDetailView(APIView):
     def get(self, request, invoice_id):
         try:
             invoice = self.get_object(invoice_id)
-        except PaymentInvoice.DoesNotExist:
+        except (PaymentInvoice.DoesNotExist, ValueError):
             return Response({"detail": "Invoice not found."}, status=404)
-        auth_result = _authorize_invoice_request(request, invoice)
-        if isinstance(auth_result, Response):
-            return auth_result
         invoice = _expire_if_needed(invoice)
-        return _invoice_response(invoice, token=auth_result)
+        has_session = authorize_checkout_session(request, invoice)
+        response = _invoice_response(invoice)
+        if not has_session and not _is_org_admin_for_invoice(request, invoice):
+            session_token = create_checkout_session(invoice)
+            response = _set_checkout_cookie(response, session_token)
+        return response
 
 
 class CurrentInvoiceView(APIView):
@@ -230,7 +232,7 @@ class CurrentInvoiceView(APIView):
         return _invoice_response(invoice)
 
 
-class InvoiceSessionExchangeView(CsrfProtectedAPIView):
+class InvoiceSessionExchangeView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "invoice_recover"

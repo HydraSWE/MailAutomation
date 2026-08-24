@@ -9,7 +9,9 @@ export default function Payment() {
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const fragmentCode = new URLSearchParams((location.hash || "").replace(/^#/, "")).get("code") || "";
+  const searchParams = new URLSearchParams(location.search);
+  const hashParams = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  const accessCode = searchParams.get("code") || searchParams.get("token") || hashParams.get("code") || hashParams.get("token") || "";
   const [invoice, setInvoice] = useState(null);
   const [transaction, setTransaction] = useState("");
   const [password, setPassword] = useState("");
@@ -34,29 +36,45 @@ export default function Payment() {
   }, [invoiceId]);
 
   useEffect(() => {
-    async function openSession() {
-      if (fragmentCode) {
+    let mounted = true;
+    async function initPayment() {
+      setLoading(true);
+      setError("");
+      if (accessCode) {
         try {
-          const value = await exchangeInvoiceCode(invoiceId, fragmentCode);
-          setInvoice(value);
-          navigate(location.pathname, { replace: true });
-        } catch (err) {
-          setError(apiError(err, "This invoice link is no longer valid."));
+          const value = await exchangeInvoiceCode(invoiceId, accessCode);
+          if (mounted) {
+            setInvoice(value);
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        } catch {
+          try {
+            const fallback = invoiceId === "current" ? await getCurrentInvoice() : await getInvoice(invoiceId);
+            if (mounted) {
+              setInvoice(fallback);
+              window.history.replaceState(null, "", window.location.pathname);
+            }
+          } catch (err) {
+            if (mounted) setError(apiError(err, "This invoice link is no longer valid."));
+          }
         } finally {
-          setLoading(false);
+          if (mounted) setLoading(false);
         }
       } else {
         try {
           const value = invoiceId === "current" ? await getCurrentInvoice() : await getInvoice(invoiceId);
-          setInvoice(value);
+          if (mounted) setInvoice(value);
         } catch (err) {
-          setError(apiError(err, "This invoice could not be loaded."));
+          if (mounted) setError(apiError(err, "This invoice could not be loaded."));
         } finally {
-          setLoading(false);
+          if (mounted) setLoading(false);
         }
       }
     }
-    openSession();
+    initPayment();
+    return () => {
+      mounted = false;
+    };
   }, [invoiceId]);
 
   async function verify(event) {

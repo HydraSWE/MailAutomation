@@ -99,6 +99,17 @@ def create_owner_approved_invoice(
         },
     )
 
+    # Cancel any prior active pending invoices for this email or quote
+    PaymentInvoice.objects.filter(
+        normalized_customer_email=quote.normalized_customer_email,
+        status__in=(
+            PaymentInvoice.Status.PENDING,
+            PaymentInvoice.Status.VERIFYING,
+            PaymentInvoice.Status.PAYMENT_DETECTED,
+            PaymentInvoice.Status.CONFIRMING,
+        ),
+    ).update(status=PaymentInvoice.Status.CANCELLED, updated_at=now)
+
     _populate_invoice_payment(invoice, network, billing_config)
     _reserve_unique_invoice_amount(invoice, billing_config)
     invoice.save()

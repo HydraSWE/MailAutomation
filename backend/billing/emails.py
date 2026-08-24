@@ -490,7 +490,6 @@ def deliver_renewal_reminder_email(delivery: Any, admin_name: Optional[str] = No
 
 # --- Custom Plan Quotes & Post-Payment Activation Emails ---
 
-
 def deliver_custom_quote_received_email(quote: Any) -> None:
     subject = f"Custom Plan Quote Request Received - {quote.quote_number}"
     intro = f"Hello {quote.customer_name}, we have received your custom plan request for {quote.organization_name}."
@@ -553,7 +552,7 @@ def deliver_owner_quote_alert_email(quote: Any) -> None:
 
 def deliver_custom_quote_invoice_email(quote: Any) -> None:
     invoice = quote.invoice
-    pay_url = f"{settings.FRONTEND_URL.rstrip('/')}/pay/{invoice.id}"
+    pay_url = invoice_link(invoice)
     subject = f"Your Custom Plan Invoice is Ready (72h Expiration) - {quote.quote_number}"
     intro = f"Hello {quote.customer_name}, your enterprise quote #{quote.quote_number} for {quote.organization_name} has been approved."
     expires_str = format_datetime(invoice.expires_at)
@@ -596,7 +595,8 @@ def deliver_custom_quote_rejected_email(quote: Any) -> None:
     ]
     body = (
         f"Hello {quote.customer_name},\n\n"
-        f"Regarding your custom plan quote #{quote.quote_number} for {quote.organization_name}:\n"        f"We are unable to approve this custom configuration at this time.\n\n"
+        f"Regarding your custom plan quote #{quote.quote_number} for {quote.organization_name}:\n"
+        f"We are unable to approve this custom configuration at this time.\n\n"
         f"Reason: {quote.rejection_reason or 'Unsupported configuration'}\n\n"
         "Feel free to check our standard plans or submit an adjusted quote request."
     )

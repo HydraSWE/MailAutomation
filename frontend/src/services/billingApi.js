@@ -12,18 +12,26 @@ function getCookie(name) {
     ?.split("=")[1] || "";
 }
 
-async function ensureCsrf() {
+export async function ensureCsrf() {
   const cookieToken = getCookie("csrftoken");
   if (cookieToken) return decodeURIComponent(cookieToken);
-  const response = await publicClient.get("/billing/csrf/");
-  return response.data?.csrfToken || "";
+  try {
+    const response = await publicClient.get("/billing/csrf/");
+    return response.data?.csrfToken || "";
+  } catch {
+    return "";
+  }
 }
+
+export const bootstrapCsrf = ensureCsrf;
 
 publicClient.interceptors.request.use(async (config) => {
   const method = (config.method || "get").toLowerCase();
   if (!["get", "head", "options", "trace"].includes(method)) {
     const csrfToken = await ensureCsrf();
-    config.headers["X-CSRFToken"] = csrfToken;
+    if (csrfToken) {
+      config.headers["X-CSRFToken"] = csrfToken;
+    }
   }
   return config;
 });
@@ -91,4 +99,3 @@ export const fetchCustomActivationPendingOrgs = (sessionToken) =>
 
 export const completeCustomActivation = (payload) =>
   publicClient.post("/billing/custom-quotes/activation/complete/", payload).then((res) => res.data);
-

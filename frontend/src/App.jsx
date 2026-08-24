@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Templates from "./pages/Templates";
+import { bootstrapCsrf } from "./services/billingApi";
 
 // Recipients Pages
 import RecipientsPage from "./pages/recipients/RecipientsPage";
@@ -109,7 +111,10 @@ const router = createBrowserRouter([
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
-
 export default function App() {
+  useEffect(() => {
+    bootstrapCsrf();
+  }, []);
+
   return <ToastProvider><RouterProvider router={router} /></ToastProvider>;
 }

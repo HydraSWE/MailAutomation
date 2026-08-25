@@ -505,7 +505,7 @@ if ($action === 'activate_license') {
             sendJson([
                 'ok' => false,
                 'status' => 'unauthorized',
-                'error' => 'Access denied. ' . $email . ' requires an active paid subscription or administrator approval. Please upgrade your plan at mail-flow.annomous.com.'
+                'error' => 'Access denied. ' . $email . ' requires an Administrator or Owner role with an active paid subscription. Please contact your organization owner or upgrade at mail-flow.annomous.com.'
             ], 403);
         }
 

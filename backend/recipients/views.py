@@ -22,10 +22,10 @@ def authenticate_lead_hunter_request(request):
     Returns (user, organization) if authenticated and authorized for Lead Hunter.
     Rules:
       1. If email is not a registered, active User -> STRICT REJECT (None, None).
-      2. Authorized if:
-         a) User is superuser / staff / organization owner or admin, OR
-         b) Organization has an active paid subscription (status == 'active', not is_free, and not expired).
-         Otherwise, strictly returns (None, None).
+      2. Superuser and Staff accounts -> ALWAYS ALLOWED.
+      3. Regular accounts -> Strictly requires:
+         a) Role is 'owner' or 'admin' (non-admin members like manager/operator/viewer are blocked).
+         b) Organization has an active paid subscription (status == 'active', not is_free, not expired).
     """
     from users.models import User
     from common.models import Organization
@@ -39,12 +39,19 @@ def authenticate_lead_hunter_request(request):
     def is_lead_hunter_authorized(u, org):
         if not u or not u.is_active:
             return False
-        # Super admin, staff, or org owner/admin always authorized
-        if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False) or getattr(u, "role", "") in ("owner", "admin"):
+        # Super admin or system staff always authorized
+        if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False):
             return True
+
+        # Strictly limit access to Organization Owner and Admin roles only
+        user_role = getattr(u, "role", "")
+        if user_role not in ("owner", "admin"):
+            return False
+
         if not org:
             return False
-        # Check active paid subscription
+
+        # Require active paid subscription
         sub = getattr(org, "subscription", None)
         if sub and getattr(sub, "status", "") == "active":
             end_date = getattr(sub, "current_period_end", None)

@@ -1,4 +1,8 @@
 /* App Shell Layout Structure */
+html, body {
+  overflow-x: clip;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

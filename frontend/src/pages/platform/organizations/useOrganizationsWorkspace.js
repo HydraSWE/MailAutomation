@@ -137,15 +137,18 @@ export function useOrganizationsWorkspace() {
     }
   }
 
-  async function toggleStatus(org) {
+  const [statusConfirmOrg, setStatusConfirmOrg] = useState(null);
+  const [deleteUserTarget, setDeleteUserTarget] = useState(null);
+
+  function toggleStatus(org) {
+    setStatusConfirmOrg(org);
+  }
+
+  async function confirmToggleStatus() {
+    if (!statusConfirmOrg) return;
+    const org = statusConfirmOrg;
+    setStatusConfirmOrg(null);
     const action = org.status === "active" ? "suspend" : "reactivate";
-    if (
-      !window.confirm(
-        `${action === "suspend" ? "Suspend" : "Reactivate"} ${org.name}?`
-      )
-    ) {
-      return;
-    }
 
     try {
       await api.post(`/organizations/${org.id}/${action}/`);
@@ -201,14 +204,14 @@ export function useOrganizationsWorkspace() {
     }
   }
 
-  async function deleteOrgUser(userId) {
-    if (
-      !window.confirm(
-        "Are you sure you want to permanently delete this user? Consider deactivating instead."
-      )
-    ) {
-      return;
-    }
+  function deleteOrgUser(userId) {
+    setDeleteUserTarget(typeof userId === "object" ? userId : { id: userId });
+  }
+
+  async function confirmDeleteOrgUser() {
+    if (!deleteUserTarget) return;
+    const userId = deleteUserTarget.id;
+    setDeleteUserTarget(null);
 
     try {
       await usersApi.deleteUser(userId);
@@ -278,6 +281,6 @@ export function useOrganizationsWorkspace() {
   }
 
 
-  return { organizations, plans, form, setForm, editing, organizationModal, adminOrg, setAdminOrg, admin, setAdmin, viewUsersOrg, setViewUsersOrg, orgUsers, loadingUsers, search, setSearch, status, setStatus, message, error, setError, loading, saving, editingRole, setEditingRole, passwordTarget, setPasswordTarget, tempPassword, setTempPassword, filtered, selectedPlan, openCreate, openEdit, closeOrganizationModal, openViewUsers, saveOrganization, toggleStatus, toggleSupportWorkspace, createAdmin, deleteOrgUser, handleRoleChange, handleSetPassword, toggleUserActive, handleRevokeUserSessions };
+  return { organizations, plans, form, setForm, editing, organizationModal, adminOrg, setAdminOrg, admin, setAdmin, viewUsersOrg, setViewUsersOrg, orgUsers, loadingUsers, search, setSearch, status, setStatus, message, error, setError, loading, saving, editingRole, setEditingRole, passwordTarget, setPasswordTarget, tempPassword, setTempPassword, filtered, selectedPlan, statusConfirmOrg, setStatusConfirmOrg, confirmToggleStatus, deleteUserTarget, setDeleteUserTarget, confirmDeleteOrgUser, openCreate, openEdit, closeOrganizationModal, openViewUsers, saveOrganization, toggleStatus, toggleSupportWorkspace, createAdmin, deleteOrgUser, handleRoleChange, handleSetPassword, toggleUserActive, handleRevokeUserSessions };
 }
 

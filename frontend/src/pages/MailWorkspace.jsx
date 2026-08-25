@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Edit2, Inbox, MailPlus, Network, RefreshCw, Send, Settings2, Trash } from "lucide-react";
 import supportApi from "../services/supportApi";
 import CustomSelect from "../components/common/CustomSelect";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import { apiError } from "../utils/apiError";
 
 const ticketFilterOptions = [
@@ -220,20 +221,30 @@ export default function MailWorkspace() {
     setShowMailboxForm(true);
   }
 
-  async function deleteMailbox(mailbox) {
-    if (!window.confirm(`Delete inbox "${mailbox.name}"? Existing tickets will remain, but this inbox can no longer sync or send replies.`)) return;
+  const [mailboxToDelete, setMailboxToDelete] = useState(null);
+  const [deletingMailbox, setDeletingMailbox] = useState(false);
+
+  function deleteMailbox(mailbox) {
+    setMailboxToDelete(mailbox);
+  }
+
+  async function handleConfirmDeleteMailbox() {
+    if (!mailboxToDelete) return;
+    setDeletingMailbox(true);
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      await supportApi.deleteMailbox(mailbox.id);
+      await supportApi.deleteMailbox(mailboxToDelete.id);
       setMessage("Mailbox deleted.");
-      if (String(mailbox.id) === mailboxId) setMailboxId("");
+      if (String(mailboxToDelete.id) === mailboxId) setMailboxId("");
       await load();
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Unable to delete mailbox.");
     } finally {
+      setDeletingMailbox(false);
       setBusy(false);
+      setMailboxToDelete(null);
     }
   }
 
@@ -477,6 +488,18 @@ export default function MailWorkspace() {
           </div>
         </section>
       </div>
+
+      {/* Delete Mailbox Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(mailboxToDelete)}
+        title="Delete Inbox"
+        message={`Delete inbox "${mailboxToDelete?.name}"? Existing tickets will remain, but this inbox can no longer sync or send replies.`}
+        confirmLabel="Delete Inbox"
+        isDanger
+        loading={deletingMailbox}
+        onCancel={() => setMailboxToDelete(null)}
+        onConfirm={handleConfirmDeleteMailbox}
+      />
     </div>
   );
 }

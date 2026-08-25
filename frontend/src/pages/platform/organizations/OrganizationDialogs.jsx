@@ -1,7 +1,8 @@
 import { Check, Edit2, Key, LogOut, Shield, Trash2, UserCheck, UserX, X } from "lucide-react";
 import CustomSelect from "../../../components/common/CustomSelect";
+import ConfirmDialog from "../../../components/common/ConfirmDialog";
 
-export default function OrganizationDialogs({ organizationModal, editing, closeOrganizationModal, saveOrganization, error, setError, form, setForm, plans, selectedPlan, saving, adminOrg, setAdminOrg, createAdmin, admin, setAdmin, viewUsersOrg, setViewUsersOrg, loadingUsers, orgUsers, editingRole, setEditingRole, handleRoleChange, passwordTarget, setPasswordTarget, tempPassword, setTempPassword, handleSetPassword, toggleUserActive, handleRevokeUserSessions, deleteOrgUser }) {
+export default function OrganizationDialogs({ organizationModal, editing, closeOrganizationModal, saveOrganization, error, setError, form, setForm, plans, selectedPlan, saving, adminOrg, setAdminOrg, createAdmin, admin, setAdmin, viewUsersOrg, setViewUsersOrg, loadingUsers, orgUsers, editingRole, setEditingRole, handleRoleChange, passwordTarget, setPasswordTarget, tempPassword, setTempPassword, handleSetPassword, toggleUserActive, handleRevokeUserSessions, deleteOrgUser, statusConfirmOrg, setStatusConfirmOrg, confirmToggleStatus, deleteUserTarget, setDeleteUserTarget, confirmDeleteOrgUser }) {
   return <>
       {/* Organization Modal */}
       {organizationModal && (
@@ -338,6 +339,28 @@ export default function OrganizationDialogs({ organizationModal, editing, closeO
           </div>
         </Modal>
       )}
+
+      {/* Organization Status Toggle Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(statusConfirmOrg)}
+        title={`${statusConfirmOrg?.status === "active" ? "Suspend" : "Reactivate"} Organization`}
+        message={`Are you sure you want to ${statusConfirmOrg?.status === "active" ? "suspend" : "reactivate"} ${statusConfirmOrg?.name}?`}
+        confirmLabel={statusConfirmOrg?.status === "active" ? "Suspend" : "Reactivate"}
+        isDanger={statusConfirmOrg?.status === "active"}
+        onCancel={() => setStatusConfirmOrg(null)}
+        onConfirm={confirmToggleStatus}
+      />
+
+      {/* Organization User Deletion Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteUserTarget)}
+        title="Delete User Account"
+        message="Are you sure you want to permanently delete this user? Consider deactivating instead."
+        confirmLabel="Delete User"
+        isDanger
+        onCancel={() => setDeleteUserTarget(null)}
+        onConfirm={confirmDeleteOrgUser}
+      />
   </>;
 }
 

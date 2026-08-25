@@ -30,12 +30,21 @@ function Range({ label, value, min, max, step, onChange }) {
   );
 }
 
-export default function CustomPlanCard({ basePlan, customPlan }) {
+export default function CustomPlanCard({ basePlan, customPlan, addonPrices }) {
   const [emails, setEmails] = useState(300000);
   const [admins, setAdmins] = useState(8);
   const [users, setUsers] = useState(80);
   const [connections, setConnections] = useState(15);
   const [recipients, setRecipients] = useState(50000);
+
+  const rates = {
+    email_10k: Number(addonPrices?.email_10k || 120),
+    admin: Number(addonPrices?.admin || 150),
+    user: Number(addonPrices?.user || 20),
+    smtp_inbox: Number(addonPrices?.smtp_inbox || 300),
+    recipient_10k: Number(addonPrices?.recipient_10k || 100),
+    max_self_serve_price: Number(addonPrices?.max_self_serve_price || 15000),
+  };
 
   const premiumWasPrice = Number(basePlan?.original_price_bdt || 0);
   const premiumPayablePrice = Number(basePlan?.price_bdt || premiumWasPrice || 0);
@@ -49,16 +58,16 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
   const baseConnections = Number(basePlan?.max_smtp_accounts || 10);
   const baseRecipients = Number(basePlan?.max_recipients || 10000);
 
-  const emailExtra = Math.max(0, Math.ceil((emails - baseEmails) / 10000)) * 120;
-  const adminExtra = Math.max(0, admins - baseAdmins) * 150;
-  const userExtra = Math.max(0, users - baseUsers) * 20;
-  const connectionExtra = Math.max(0, connections - baseConnections) * 300;
-  const recipientExtra = Math.max(0, Math.ceil((recipients - baseRecipients) / 10000)) * 100;
+  const emailExtra = Math.max(0, Math.ceil((emails - baseEmails) / 10000)) * rates.email_10k;
+  const adminExtra = Math.max(0, admins - baseAdmins) * rates.admin;
+  const userExtra = Math.max(0, users - baseUsers) * rates.user;
+  const connectionExtra = Math.max(0, connections - baseConnections) * rates.smtp_inbox;
+  const recipientExtra = Math.max(0, Math.ceil((recipients - baseRecipients) / 10000)) * rates.recipient_10k;
   const extraOriginal = emailExtra + adminExtra + userExtra + connectionExtra + recipientExtra;
   const estimatedOriginal = baseOriginal + extraOriginal;
   const estimatedPayable = applyDiscount(estimatedOriginal, customDiscountPercent);
   const discountAmount = Math.max(0, estimatedOriginal - estimatedPayable);
-  const needsQuote = emails > 1000000 || connections > 40 || users > 250 || admins > 25;
+  const needsQuote = estimatedPayable > rates.max_self_serve_price;
   const customParams = new URLSearchParams({
     emails: String(emails),
     admins: String(admins),
@@ -104,7 +113,9 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
               Starts from Premium+ {premiumHasDiscount ? "was price" : "payable price"}: ৳{format(baseOriginal)}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">
-              {customDiscountPercent > 0 ? `${customDiscountPercent}% Custom discount applied.` : "Custom discount is separate from Premium+."}
+              {customDiscountPercent > 0
+                ? `${customDiscountPercent}% Custom discount applied.`
+                : "Custom discount is separate from Premium+."}
             </p>
           </div>
 
@@ -132,11 +143,46 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
           </div>
 
           <div className="mt-5 space-y-4">
-            <Range label="Monthly emails" value={emails} min={baseEmails} max={1200000} step={10000} onChange={setEmails} />
-            <Range label="Admins" value={admins} min={baseAdmins} max={30} step={1} onChange={setAdmins} />
-            <Range label="Users" value={users} min={baseUsers} max={300} step={5} onChange={setUsers} />
-            <Range label="SMTP + inboxes" value={connections} min={baseConnections} max={50} step={1} onChange={setConnections} />
-            <Range label="Recipients" value={recipients} min={baseRecipients} max={200000} step={10000} onChange={setRecipients} />
+            <Range
+              label="Monthly emails"
+              value={emails}
+              min={baseEmails}
+              max={1200000}
+              step={10000}
+              onChange={setEmails}
+            />
+            <Range
+              label="Admins"
+              value={admins}
+              min={baseAdmins}
+              max={30}
+              step={1}
+              onChange={setAdmins}
+            />
+            <Range
+              label="Users"
+              value={users}
+              min={baseUsers}
+              max={300}
+              step={5}
+              onChange={setUsers}
+            />
+            <Range
+              label="SMTP + inboxes"
+              value={connections}
+              min={baseConnections}
+              max={50}
+              step={1}
+              onChange={setConnections}
+            />
+            <Range
+              label="Recipients"
+              value={recipients}
+              min={baseRecipients}
+              max={200000}
+              step={10000}
+              onChange={setRecipients}
+            />
           </div>
 
           <ul className="space-y-3 mt-5 text-xs text-slate-300">
@@ -146,7 +192,11 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
             </li>
             <li className="flex items-center gap-2.5">
               <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{needsQuote ? "Enterprise approval & locked 72h invoice" : "Extra 10k emails from ৳120"}</span>
+              <span>
+                {needsQuote
+                  ? "Enterprise approval & locked 72h invoice"
+                  : `Extra 10k emails from ৳${rates.email_10k}`}
+              </span>
             </li>
           </ul>
         </div>
@@ -173,8 +223,6 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
         </div>
       </article>
 
-
-
       <CustomQuoteModal
         isOpen={isQuoteModalOpen}
         onClose={() => setIsQuoteModalOpen(false)}
@@ -183,4 +231,3 @@ export default function CustomPlanCard({ basePlan, customPlan }) {
     </>
   );
 }
-

@@ -20,10 +20,10 @@ export function useSettingsWorkspace() {
   // Settings State
   const [settings, setSettings] = useState({
     // General
-    company_name: "Acme Enterprises Inc.",
-    default_sender_name: "Marketing Team",
-    default_sender_email: "marketing@acme.com",
-    default_reply_to: "support@acme.com",
+    company_name: "",
+    default_sender_name: "",
+    default_sender_email: "",
+    default_reply_to: "",
     default_timezone: "UTC",
     date_format: "YYYY-MM-DD",
     default_page_size: 10,
@@ -37,13 +37,13 @@ export function useSettingsWorkspace() {
     tracking_enabled: true,
     click_tracking: true,
     plaintext_fallback: true,
-    unsubscribe_footer: "You are receiving this email because you opted into our newsletter. Click here to unsubscribe.",
+    unsubscribe_footer: "",
 
     // Storage
     max_upload_size_mb: 25,
     allowed_image_formats: "jpg, png, gif, webp",
     allowed_attachment_formats: "pdf, docx, xlsx, zip",
-    media_storage_path: "/var/mail_automation/media/",
+    media_storage_path: "/app/media/",
     file_retention_days: 90,
 
     // Security
@@ -60,6 +60,7 @@ export function useSettingsWorkspace() {
   const userModal = useModal();
   const deleteUserModal = useModal();
   const passwordResetModal = useModal();
+  const reset2FAModal = useModal();
   const [userData, setUserData] = useState({ name: "", email: "", role: "operator", password: "" });
   const [resetPassword, setResetPassword] = useState("");
   const [seatUsage, setSeatUsage] = useState({ admins: 0, maxAdmins: 0, users: 0, maxUsers: 0 });
@@ -447,14 +448,14 @@ export function useSettingsWorkspace() {
     }
   };
 
-  const handleResetUser2FA = async (user) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to reset 2FA for ${user.name || user.email}? Their authenticator secret and backup codes will be cleared, allowing them to sign in or re-enroll.`
-      )
-    ) {
-      return;
-    }
+  const handleResetUser2FA = (user) => {
+    reset2FAModal.openModal(user);
+  };
+
+  const onConfirmResetUser2FA = async () => {
+    const user = reset2FAModal.data;
+    if (!user) return;
+    reset2FAModal.closeModal();
     try {
       await usersApi.resetUser2FA(user.id);
       toast.success(`2FA has been reset for ${user.name || user.email}.`);
@@ -664,6 +665,8 @@ export function useSettingsWorkspace() {
     handleSaveUser,
     handleDeleteUser,
     handleResetPassword,
+    reset2FAModal,
+    onConfirmResetUser2FA,
     handleStart2FASetup,
     handleConfirm2FA,
     handleDisable2FA,

@@ -19,15 +19,7 @@ const paidNetworks = [
   ["ethereum", "Ethereum (ERC20 USDT)"],
 ];
 
-const customAddonPrices = { email_10k: 120, admin: 150, user: 20, smtp: 300, recipient_10k: 100 };
-
-const SELF_SERVE_THRESHOLDS = {
-  emails: 1000000,
-  admins: 25,
-  users: 250,
-  smtp: 40,
-  recipients: 200000,
-};
+const customAddonPrices = { email_10k: 120, admin: 150, user: 20, smtp: 300, recipient_10k: 100, max_self_serve_price: 15000 };
 
 function calculateCustomPricing(customPlan, premiumPlan, limits) {
   if (!customPlan || !premiumPlan || !limits) {
@@ -39,11 +31,19 @@ function calculateCustomPricing(customPlan, premiumPlan, limits) {
     ? premiumWas
     : premiumPayable;
 
-  const emailExtra = Math.max(0, Math.ceil(((limits.email_limit || 0) - (premiumPlan.email_limit || 0)) / 10000)) * customAddonPrices.email_10k;
-  const adminExtra = Math.max(0, (limits.max_admins || 0) - (premiumPlan.max_admins || 0)) * customAddonPrices.admin;
-  const userExtra = Math.max(0, (limits.max_users || 0) - (premiumPlan.max_users || 0)) * customAddonPrices.user;
-  const smtpExtra = Math.max(0, (limits.max_smtp_accounts || 0) - (premiumPlan.max_smtp_accounts || 0)) * customAddonPrices.smtp;
-  const recipientExtra = Math.max(0, Math.ceil(((limits.max_recipients || 0) - (premiumPlan.max_recipients || 0)) / 10000)) * customAddonPrices.recipient_10k;
+  const rates = {
+    email_10k: Number(customPlan?.addon_prices?.email_10k || premiumPlan?.addon_prices?.email_10k || customAddonPrices.email_10k),
+    admin: Number(customPlan?.addon_prices?.admin || premiumPlan?.addon_prices?.admin || customAddonPrices.admin),
+    user: Number(customPlan?.addon_prices?.user || premiumPlan?.addon_prices?.user || customAddonPrices.user),
+    smtp: Number(customPlan?.addon_prices?.smtp_inbox || premiumPlan?.addon_prices?.smtp_inbox || customAddonPrices.smtp),
+    recipient_10k: Number(customPlan?.addon_prices?.recipient_10k || premiumPlan?.addon_prices?.recipient_10k || customAddonPrices.recipient_10k),
+  };
+
+  const emailExtra = Math.max(0, Math.ceil(((limits.email_limit || 0) - (premiumPlan.email_limit || 0)) / 10000)) * rates.email_10k;
+  const adminExtra = Math.max(0, (limits.max_admins || 0) - (premiumPlan.max_admins || 0)) * rates.admin;
+  const userExtra = Math.max(0, (limits.max_users || 0) - (premiumPlan.max_users || 0)) * rates.user;
+  const smtpExtra = Math.max(0, (limits.max_smtp_accounts || 0) - (premiumPlan.max_smtp_accounts || 0)) * rates.smtp;
+  const recipientExtra = Math.max(0, Math.ceil(((limits.max_recipients || 0) - (premiumPlan.max_recipients || 0)) / 10000)) * rates.recipient_10k;
 
   const addons = emailExtra + adminExtra + userExtra + smtpExtra + recipientExtra;
   const subtotal = base + addons;
@@ -119,15 +119,8 @@ export default function AccountAdmin() {
   const customPlan = plans.find((plan) => plan.slug === "custom");
   const pricing = calculateCustomPricing(customPlan, premiumPlusPlan, customLimits);
 
-  const isBiggerQuota = Boolean(
-    customLimits && (
-      customLimits.email_limit > SELF_SERVE_THRESHOLDS.emails ||
-      customLimits.max_admins > SELF_SERVE_THRESHOLDS.admins ||
-      customLimits.max_users > SELF_SERVE_THRESHOLDS.users ||
-      customLimits.max_smtp_accounts > SELF_SERVE_THRESHOLDS.smtp ||
-      customLimits.max_recipients > SELF_SERVE_THRESHOLDS.recipients
-    )
-  );
+  const selfServeCeiling = Number(customPlan?.addon_prices?.max_self_serve_price || customAddonPrices.max_self_serve_price || 15000);
+  const isBiggerQuota = Boolean(customLimits && pricing.total > selfServeCeiling);
 
   const beginUpgrade = async () => {
     setUpgrading(true);
@@ -514,7 +507,6 @@ export default function AccountAdmin() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-slate-200">Monthly Emails</span>
-                        <span className="text-[10px] text-slate-500 block">Self-serve max: 1,000,000</span>
                       </div>
                       <input
                         type="number"
@@ -537,7 +529,6 @@ export default function AccountAdmin() {
                     />
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                       <span>150k</span>
-                      <span className="text-indigo-400 font-bold">1.0M (Self-Serve Max)</span>
                       <span>5.0M+</span>
                     </div>
                   </div>
@@ -547,7 +538,6 @@ export default function AccountAdmin() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-slate-200">SMTP Accounts + Inboxes</span>
-                        <span className="text-[10px] text-slate-500 block">Self-serve max: 40 accounts</span>
                       </div>
                       <input
                         type="number"
@@ -570,7 +560,6 @@ export default function AccountAdmin() {
                     />
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                       <span>10</span>
-                      <span className="text-indigo-400 font-bold">40 (Self-Serve Max)</span>
                       <span>100</span>
                     </div>
                   </div>
@@ -580,7 +569,6 @@ export default function AccountAdmin() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-slate-200">Administrators</span>
-                        <span className="text-[10px] text-slate-500 block">Self-serve max: 25 admins</span>
                       </div>
                       <input
                         type="number"
@@ -603,7 +591,6 @@ export default function AccountAdmin() {
                     />
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                       <span>5</span>
-                      <span className="text-indigo-400 font-bold">25</span>
                       <span>50</span>
                     </div>
                   </div>
@@ -613,7 +600,6 @@ export default function AccountAdmin() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-slate-200">Team Users</span>
-                        <span className="text-[10px] text-slate-500 block">Self-serve max: 250 users</span>
                       </div>
                       <input
                         type="number"
@@ -636,7 +622,6 @@ export default function AccountAdmin() {
                     />
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                       <span>50</span>
-                      <span className="text-indigo-400 font-bold">250</span>
                       <span>500</span>
                     </div>
                   </div>
@@ -646,7 +631,6 @@ export default function AccountAdmin() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold text-slate-200">Audience Recipients Database</span>
-                        <span className="text-[10px] text-slate-500 block">Self-serve max: 200,000 contacts</span>
                       </div>
                       <input
                         type="number"
@@ -669,7 +653,6 @@ export default function AccountAdmin() {
                     />
                     <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                       <span>10,000</span>
-                      <span className="text-indigo-400 font-bold">200,000</span>
                       <span>1,000,000</span>
                     </div>
                   </div>

@@ -1,53 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Edit2,
-  Key,
-  Loader2,
-  LogOut,
-  Plus,
-  Power,
-  Search,
-  Shield,
-  ShieldCheck,
-  ShieldOff,
-  AlertTriangle,
-  Trash2,
-  UserCheck,
-  UserX,
-  X,
-} from "lucide-react";
-import usersApi from "../../../services/usersApi";
-import api from "../../../services/api";
-import CustomSelect from "../../../components/common/CustomSelect";
-import SearchInput from "../../../components/common/SearchInput";
-import ConfirmDialog from "../../../components/common/ConfirmDialog";
-import { apiError } from "../../../utils/apiError";
+import { Plus } from "lucide-react";
 import { useUsersWorkspace } from "./useUsersWorkspace";
 import UsersFilters from "./UsersFilters";
 import UsersTable from "./UsersTable";
 import UserDialogs, { Notice } from "./UserDialogs";
-
-const ROLES = [
-  { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "operator", label: "Operator" },
-  { value: "viewer", label: "Viewer" },
-];
-
-const emptyForm = {
-  name: "",
-  email: "",
-  username: "",
-  password: "",
-  role: "operator",
-  organization: "",
-};
 
 export default function PlatformUsers() {
   const {
     users, organizations, loading, saving, message, error, setError, search, setSearch, filterOrg, setFilterOrg,
     filterRole, setFilterRole, filterStatus, setFilterStatus, userModal, editing, form, setForm,
     passwordModal, setPasswordModal, newPassword, setNewPassword, deleteTarget, setDeleteTarget,
+    reset2FATarget, setReset2FATarget, confirmReset2FA,
     filtered, editingUser, setEditingUser, openCreate, openEdit, closeUserModal, saveUser,
     handleSetPassword, handleDelete, toggleActive, handleRevokeSessions, handleReset2FA, roleBadge,
   } = useUsersWorkspace();
@@ -80,7 +42,7 @@ export default function PlatformUsers() {
 
       <UsersTable users={users} filtered={filtered} loading={loading} roleBadge={roleBadge} openEdit={openEdit} setPasswordModal={setPasswordModal} setNewPassword={setNewPassword} setError={setError} reset2FA={handleReset2FA} toggleActive={toggleActive} revokeSessions={handleRevokeSessions} setDeleteTarget={setDeleteTarget} />
 
-      <UserDialogs userModal={userModal} editing={editing} closeUserModal={closeUserModal} saveUser={saveUser} error={error} setError={setError} form={form} setForm={setForm} organizations={organizations} saving={saving} editingUser={editingUser} setEditingUser={setEditingUser} handleReset2FA={handleReset2FA} passwordModal={passwordModal} setPasswordModal={setPasswordModal} newPassword={newPassword} setNewPassword={setNewPassword} handleSetPassword={handleSetPassword} deleteTarget={deleteTarget} setDeleteTarget={setDeleteTarget} handleDelete={handleDelete} />
+      <UserDialogs userModal={userModal} editing={editing} closeUserModal={closeUserModal} saveUser={saveUser} error={error} setError={setError} form={form} setForm={setForm} organizations={organizations} saving={saving} editingUser={editingUser} setEditingUser={setEditingUser} handleReset2FA={handleReset2FA} passwordModal={passwordModal} setPasswordModal={setPasswordModal} newPassword={newPassword} setNewPassword={setNewPassword} handleSetPassword={handleSetPassword} deleteTarget={deleteTarget} setDeleteTarget={setDeleteTarget} handleDelete={handleDelete} reset2FATarget={reset2FATarget} setReset2FATarget={setReset2FATarget} confirmReset2FA={confirmReset2FA} />
     </div>
   );
 }

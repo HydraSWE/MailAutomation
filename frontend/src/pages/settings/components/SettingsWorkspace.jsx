@@ -80,7 +80,7 @@ export default function SettingsPage() {
       {activeTab === "security" && <SecuritySettingsTab settings={settings} setSettings={setSettings} onSave={handleSaveSettings} saving={saving} />}
 
       {/* Tab 5: Users & Role Settings */}
-      {activeTab === "users" && <UsersRolesTab users={users} usersLoading={usersLoading} seatUsage={seatUsage} userColumns={userColumns} userModal={userModal} userData={userData} setUserData={setUserData} onSaveUser={handleSaveUser} passwordResetModal={passwordResetModal} resetPassword={resetPassword} setResetPassword={setResetPassword} onResetPassword={handleResetPassword} deleteUserModal={deleteUserModal} onDeleteUser={handleDeleteUser} />}
+      {activeTab === "users" && <UsersRolesTab users={users} usersLoading={usersLoading} seatUsage={seatUsage} userColumns={userColumns} userModal={userModal} userData={userData} setUserData={setUserData} onSaveUser={handleSaveUser} passwordResetModal={passwordResetModal} resetPassword={resetPassword} setResetPassword={setResetPassword} onResetPassword={handleResetPassword} deleteUserModal={deleteUserModal} onDeleteUser={handleDeleteUser} reset2FAModal={reset2FAModal} onConfirmResetUser2FA={onConfirmResetUser2FA} />}
 
       {/* Tab 6: Profile Settings */}
       {activeTab === "profile" && (

@@ -4,7 +4,7 @@ import ConfirmDialog from "../../../components/common/ConfirmDialog";
 
 const ROLES = [{ value: "admin", label: "Admin" }, { value: "manager", label: "Manager" }, { value: "operator", label: "Operator" }, { value: "viewer", label: "Viewer" }];
 
-export default function UserDialogs({ userModal, editing, closeUserModal, saveUser, error, setError, form, setForm, organizations, saving, editingUser, setEditingUser, handleReset2FA, passwordModal, setPasswordModal, newPassword, setNewPassword, handleSetPassword, deleteTarget, setDeleteTarget, handleDelete }) {
+export default function UserDialogs({ userModal, editing, closeUserModal, saveUser, error, setError, form, setForm, organizations, saving, editingUser, setEditingUser, handleReset2FA, passwordModal, setPasswordModal, newPassword, setNewPassword, handleSetPassword, deleteTarget, setDeleteTarget, handleDelete, reset2FATarget, setReset2FATarget, confirmReset2FA }) {
   return <>
       {/* Add / Edit User Modal */}
       {userModal && (
@@ -194,6 +194,19 @@ export default function UserDialogs({ userModal, editing, closeUserModal, saveUs
           deleteTarget?.name || deleteTarget?.username
         }? This action cannot be undone. Consider deactivating instead.`}
         confirmLabel="Delete permanently"
+        isDanger
+      />
+
+      {/* Reset 2FA Confirmation */}
+      <ConfirmDialog
+        isOpen={!!reset2FATarget}
+        onCancel={() => setReset2FATarget(null)}
+        onConfirm={confirmReset2FA}
+        title="Reset user 2FA"
+        message={`Are you sure you want to reset 2FA for ${
+          reset2FATarget?.name || reset2FATarget?.username
+        }? Their authenticator secret and backup codes will be cleared immediately.`}
+        confirmLabel="Reset 2FA"
         isDanger
       />
   </>;

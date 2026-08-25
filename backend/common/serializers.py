@@ -118,6 +118,8 @@ class BillingConfigurationSerializer(serializers.ModelSerializer):
             "usdt_bdt_rate", "payment_evm_wallet", "payment_tron_wallet", "payment_ton_wallet",
             "tron_api_key", "toncenter_api_key", "clear_tron_api_key", "clear_toncenter_api_key",
             "tron_api_key_configured", "toncenter_api_key_configured", "public_landing_monitor_active",
+            "addon_email_10k_price", "addon_admin_price", "addon_user_price", "addon_smtp_price", "addon_recipient_10k_price",
+            "custom_plan_max_self_serve_price_bdt",
             "updated_by_email", "updated_at",
         )
         read_only_fields = ("tron_api_key_configured", "toncenter_api_key_configured", "updated_by_email", "updated_at")

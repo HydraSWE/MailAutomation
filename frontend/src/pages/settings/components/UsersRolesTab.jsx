@@ -4,7 +4,7 @@ import FormModal from "../../../components/common/FormModal";
 import ConfirmDialog from "../../../components/common/ConfirmDialog";
 import CustomSelect from "../../../components/common/CustomSelect";
 
-export default function UsersRolesTab({ users, usersLoading, seatUsage, userColumns, userModal, userData, setUserData, onSaveUser, passwordResetModal, resetPassword, setResetPassword, onResetPassword, deleteUserModal, onDeleteUser }) {
+export default function UsersRolesTab({ users, usersLoading, seatUsage, userColumns, userModal, userData, setUserData, onSaveUser, passwordResetModal, resetPassword, setResetPassword, onResetPassword, deleteUserModal, onDeleteUser, reset2FAModal, onConfirmResetUser2FA }) {
   return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -176,6 +176,16 @@ export default function UsersRolesTab({ users, usersLoading, seatUsage, userColu
             title="Delete User Account"
             message={`Are you sure you want to permanently delete ${deleteUserModal.data?.name || deleteUserModal.data?.email}? This action cannot be undone. Consider deactivating the user instead.`}
             confirmLabel="Delete User"
+            isDanger={true}
+          />
+
+          <ConfirmDialog
+            isOpen={reset2FAModal?.isOpen}
+            onCancel={reset2FAModal?.closeModal}
+            onConfirm={onConfirmResetUser2FA}
+            title="Reset User 2FA"
+            message={`Are you sure you want to reset 2FA for ${reset2FAModal?.data?.name || reset2FAModal?.data?.email}? Their authenticator secret and backup codes will be cleared, allowing them to sign in or re-enroll.`}
+            confirmLabel="Reset 2FA"
             isDanger={true}
           />
         </div>

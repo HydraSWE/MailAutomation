@@ -1,42 +1,19 @@
-import { useState, useEffect, useMemo } from "react";
-import {
-  Check,
-  Edit2,
-  Key,
-  LifeBuoy,
-  LogOut,
-  Pencil,
-  Plus,
-  Power,
-  Search,
-  UserCheck,
-  UserPlus,
-  Users,
-  UserX,
-  X,
-  Shield,
-  Trash2,
-} from "lucide-react";
-import api from "../../../services/api";
-import usersApi from "../../../services/usersApi";
-import CustomSelect from "../../../components/common/CustomSelect";
-import SearchInput from "../../../components/common/SearchInput";
-import { apiError } from "../../../utils/apiError";
+import { Plus } from "lucide-react";
 import { useOrganizationsWorkspace } from "./useOrganizationsWorkspace";
 import OrganizationsFilters from "./OrganizationsFilters";
 import OrganizationsTable from "./OrganizationsTable";
 import OrganizationDialogs, { Notice } from "./OrganizationDialogs";
-
-const emptyOrganization = { name: "", plan_slug: "" };
 
 export default function PlatformOrganizations() {
   const {
     organizations, plans, form, setForm, editing, organizationModal, adminOrg, setAdminOrg,
     admin, setAdmin, viewUsersOrg, setViewUsersOrg, orgUsers, loadingUsers, search, setSearch,
     status, setStatus, message, error, setError, loading, saving, editingRole, setEditingRole, passwordTarget,
-    setPasswordTarget, tempPassword, setTempPassword, filtered, selectedPlan, openCreate, openEdit,
-    closeOrganizationModal, openViewUsers, saveOrganization, toggleStatus, toggleSupportWorkspace,
-    createAdmin, deleteOrgUser, handleRoleChange, handleSetPassword, toggleUserActive, handleRevokeUserSessions,
+    setPasswordTarget, tempPassword, setTempPassword, filtered, selectedPlan, statusConfirmOrg,
+    setStatusConfirmOrg, confirmToggleStatus, deleteUserTarget, setDeleteUserTarget, confirmDeleteOrgUser,
+    openCreate, openEdit, closeOrganizationModal, openViewUsers, saveOrganization, toggleStatus,
+    toggleSupportWorkspace, createAdmin, deleteOrgUser, handleRoleChange, handleSetPassword,
+    toggleUserActive, handleRevokeUserSessions,
   } = useOrganizationsWorkspace();
 
   return (
@@ -70,7 +47,7 @@ export default function PlatformOrganizations() {
 
       <OrganizationsTable organizations={organizations} filtered={filtered} loading={loading} toggleSupportWorkspace={toggleSupportWorkspace} openViewUsers={openViewUsers} openEdit={openEdit} toggleStatus={toggleStatus} setAdminOrg={setAdminOrg} setError={setError} />
 
-      <OrganizationDialogs organizationModal={organizationModal} editing={editing} closeOrganizationModal={closeOrganizationModal} saveOrganization={saveOrganization} error={error} setError={setError} form={form} setForm={setForm} plans={plans} selectedPlan={selectedPlan} saving={saving} adminOrg={adminOrg} setAdminOrg={setAdminOrg} createAdmin={createAdmin} admin={admin} setAdmin={setAdmin} viewUsersOrg={viewUsersOrg} setViewUsersOrg={setViewUsersOrg} loadingUsers={loadingUsers} orgUsers={orgUsers} editingRole={editingRole} setEditingRole={setEditingRole} handleRoleChange={handleRoleChange} passwordTarget={passwordTarget} setPasswordTarget={setPasswordTarget} tempPassword={tempPassword} setTempPassword={setTempPassword} handleSetPassword={handleSetPassword} toggleUserActive={toggleUserActive} handleRevokeUserSessions={handleRevokeUserSessions} deleteOrgUser={deleteOrgUser} />
+      <OrganizationDialogs organizationModal={organizationModal} editing={editing} closeOrganizationModal={closeOrganizationModal} saveOrganization={saveOrganization} error={error} setError={setError} form={form} setForm={setForm} plans={plans} selectedPlan={selectedPlan} saving={saving} adminOrg={adminOrg} setAdminOrg={setAdminOrg} createAdmin={createAdmin} admin={admin} setAdmin={setAdmin} viewUsersOrg={viewUsersOrg} setViewUsersOrg={setViewUsersOrg} loadingUsers={loadingUsers} orgUsers={orgUsers} editingRole={editingRole} setEditingRole={setEditingRole} handleRoleChange={handleRoleChange} passwordTarget={passwordTarget} setPasswordTarget={setPasswordTarget} tempPassword={tempPassword} setTempPassword={setTempPassword} handleSetPassword={handleSetPassword} toggleUserActive={toggleUserActive} handleRevokeUserSessions={handleRevokeUserSessions} deleteOrgUser={deleteOrgUser} statusConfirmOrg={statusConfirmOrg} setStatusConfirmOrg={setStatusConfirmOrg} confirmToggleStatus={confirmToggleStatus} deleteUserTarget={deleteUserTarget} setDeleteUserTarget={setDeleteUserTarget} confirmDeleteOrgUser={confirmDeleteOrgUser} />
     </div>
   );
 }

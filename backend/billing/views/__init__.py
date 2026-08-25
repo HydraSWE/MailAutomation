@@ -1,4 +1,4 @@
-from .blockchain import BscTransactionInspectView
+from .blockchain import BlockchainTransactionInspectView, BscTransactionInspectView, OracleRatesView
 from .checkout import CheckoutEmailStartView, CheckoutEmailVerifyView, FreeSignupView
 from .common import CsrfBootstrapView
 from .custom_activation import (

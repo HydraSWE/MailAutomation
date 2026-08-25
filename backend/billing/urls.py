@@ -1,11 +1,11 @@
 from django.urls import path
 
 from .views import (
-    AccountCustomInvoiceCreateView, AccountCustomQuoteView, AccountInvoiceCreateView, BscTransactionInspectView,
+    AccountCustomInvoiceCreateView, AccountCustomQuoteView, AccountInvoiceCreateView, BlockchainTransactionInspectView, BscTransactionInspectView,
     CheckoutEmailStartView, CheckoutEmailVerifyView, FreeSignupView,
     CsrfBootstrapView, CurrentInvoiceView, CustomInvoiceCreateView, InvoiceCancelView,
     InvoiceCreateView, InvoiceDetailView, InvoiceRecoverView, InvoiceReplaceView,
-    InvoiceSessionExchangeView, InvoiceVerifyView,
+    InvoiceSessionExchangeView, InvoiceVerifyView, OracleRatesView,
     PaymentReviewViewSet, PlanAdminViewSet, PlanListView, PublicLandingMonitorView,
     CustomQuoteOtpRequestView, CustomQuoteOtpVerifyView, CustomQuoteSubmitView,
     OwnerCustomQuoteViewSet,
@@ -28,6 +28,7 @@ owner_quote_pay_approve = OwnerCustomQuoteViewSet.as_view({"post": "payment_revi
 owner_quote_pay_reject = OwnerCustomQuoteViewSet.as_view({"post": "payment_review_reject"})
 
 urlpatterns = [
+    path("oracle/rates/", OracleRatesView.as_view(), name="oracle-rates"),
     path("monitor/", PublicLandingMonitorView.as_view(), name="public-landing-monitor"),
     path("plans/", PlanListView.as_view(), name="public-plans"),
     path("platform/plans/", plan_admin_list, name="platform-plan-list"),
@@ -36,6 +37,7 @@ urlpatterns = [
     path("platform/payment-reviews/<int:pk>/", review_detail, name="platform-payment-review-detail"),
     path("platform/payment-reviews/<int:pk>/action/", review_action, name="platform-payment-review-action"),
     path("platform/bsc-transaction-inspect/", BscTransactionInspectView.as_view(), name="platform-bsc-transaction-inspect"),
+    path("platform/blockchain-transaction-inspect/", BlockchainTransactionInspectView.as_view(), name="platform-blockchain-transaction-inspect"),
     path("platform/lead-hunter/licenses/", PlatformLeadHunterLicensesView.as_view(), name="platform-lead-hunter-licenses"),
     path("platform/lead-hunter/licenses/<str:license_key>/action/", PlatformLeadHunterActionView.as_view(), name="platform-lead-hunter-action"),
 

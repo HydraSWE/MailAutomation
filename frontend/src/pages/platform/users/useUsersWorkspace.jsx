@@ -181,14 +181,16 @@ export function useUsersWorkspace() {
     }
   }
 
-  async function handleReset2FA(user) {
-    if (
-      !window.confirm(
-        `Are you sure you want to reset 2FA for ${user.name || user.username}? Their authenticator secret and backup codes will be cleared immediately.`
-      )
-    ) {
-      return;
-    }
+  const [reset2FATarget, setReset2FATarget] = useState(null);
+
+  function handleReset2FA(user) {
+    setReset2FATarget(user);
+  }
+
+  async function confirmReset2FA() {
+    if (!reset2FATarget) return;
+    const user = reset2FATarget;
+    setReset2FATarget(null);
     setError("");
     try {
       await usersApi.resetUser2FA(user.id);
@@ -220,7 +222,5 @@ export function useUsersWorkspace() {
     );
   };
 
-
-  return { users, organizations, loading, saving, message, error, setError, search, setSearch, filterOrg, setFilterOrg, filterRole, setFilterRole, filterStatus, setFilterStatus, userModal, editing, form, setForm, passwordModal, setPasswordModal, newPassword, setNewPassword, deleteTarget, setDeleteTarget, filtered, editingUser, setEditingUser, openCreate, openEdit, closeUserModal, saveUser, handleSetPassword, handleDelete, toggleActive, handleRevokeSessions, handleReset2FA, roleBadge };
+  return { users, organizations, loading, saving, message, error, setError, search, setSearch, filterOrg, setFilterOrg, filterRole, setFilterRole, filterStatus, setFilterStatus, userModal, editing, form, setForm, passwordModal, setPasswordModal, newPassword, setNewPassword, deleteTarget, setDeleteTarget, reset2FATarget, setReset2FATarget, confirmReset2FA, filtered, editingUser, setEditingUser, openCreate, openEdit, closeUserModal, saveUser, handleSetPassword, handleDelete, toggleActive, handleRevokeSessions, handleReset2FA, roleBadge };
 }
-

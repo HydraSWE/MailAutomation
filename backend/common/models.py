@@ -50,6 +50,7 @@ class OrganizationUsage(models.Model):
             models.UniqueConstraint(fields=["organization", "date"], name="unique_organization_usage_date")
         ]
 
+
 class SystemSetting(models.Model):
     objects = models.Manager()
     organization = models.OneToOneField(
@@ -62,10 +63,10 @@ class SystemSetting(models.Model):
 
     # General
     app_name = models.CharField(max_length=255, default="Mail Flow")
-    company_name = models.CharField(max_length=255, default="Acme Enterprises Inc.")
-    default_sender_name = models.CharField(max_length=255, default="Marketing Team")
-    default_sender_email = models.EmailField(default="marketing@acme.com")
-    default_reply_to = models.EmailField(default="support@acme.com")
+    company_name = models.CharField(max_length=255, blank=True, default="")
+    default_sender_name = models.CharField(max_length=255, blank=True, default="")
+    default_sender_email = models.CharField(max_length=255, blank=True, default="")
+    default_reply_to = models.CharField(max_length=255, blank=True, default="")
     default_timezone = models.CharField(max_length=100, default="UTC")
     date_format = models.CharField(max_length=50, default="YYYY-MM-DD")
     default_page_size = models.PositiveIntegerField(default=10)
@@ -79,13 +80,13 @@ class SystemSetting(models.Model):
     tracking_enabled = models.BooleanField(default=True)
     click_tracking = models.BooleanField(default=True)
     plaintext_fallback = models.BooleanField(default=True)
-    unsubscribe_footer = models.TextField(default="You are receiving this email because you opted into our newsletter. Click here to unsubscribe.")
+    unsubscribe_footer = models.TextField(blank=True, default="")
 
     # Storage
     max_upload_size_mb = models.PositiveIntegerField(default=25)
     allowed_image_formats = models.CharField(max_length=255, default="jpg, png, gif, webp")
     allowed_attachment_formats = models.CharField(max_length=255, default="pdf, docx, xlsx, zip")
-    media_storage_path = models.CharField(max_length=255, default="/var/mail_automation/media/")
+    media_storage_path = models.CharField(max_length=255, default="/app/media/")
     file_retention_days = models.PositiveIntegerField(default=90)
 
     # Security
@@ -116,6 +117,12 @@ class BillingConfiguration(models.Model):
     encrypted_tron_api_key = models.TextField(blank=True)
     encrypted_toncenter_api_key = models.TextField(blank=True)
     public_landing_monitor_active = models.BooleanField(default=False)
+    addon_email_10k_price = models.PositiveIntegerField(default=120)
+    addon_admin_price = models.PositiveIntegerField(default=150)
+    addon_user_price = models.PositiveIntegerField(default=20)
+    addon_smtp_price = models.PositiveIntegerField(default=300)
+    addon_recipient_10k_price = models.PositiveIntegerField(default=100)
+    custom_plan_max_self_serve_price_bdt = models.PositiveIntegerField(default=15000)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

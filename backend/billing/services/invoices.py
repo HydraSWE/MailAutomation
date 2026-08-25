@@ -15,6 +15,10 @@ def _quoted_amount(price_bdt, invoice_id, rate):
 
 
 def custom_pricing_preview(limits):
+    from ..configuration import get_runtime_billing_configuration
+
+    runtime_config = get_runtime_billing_configuration()
+    addon_prices = runtime_config.addon_prices
     premium_plus = Plan.objects.get(slug=PREMIUM_PLUS_PLAN_SLUG, is_active=True, is_free=False)
     custom_plan = Plan.objects.get(slug=CUSTOM_PLAN_SLUG, is_active=True, is_free=False)
     minimums = {
@@ -36,11 +40,11 @@ def custom_pricing_preview(limits):
     premium_payable = premium_plus.price_bdt or premium_was
     premium_has_discount = premium_plus.discount_percent > 0 and premium_was > premium_payable
     base_price = premium_was if premium_has_discount else premium_payable
-    email_extra = max(0, ((clean_limits["email_limit"] - premium_plus.email_limit + 9999) // 10000)) * CUSTOM_ADDON_PRICES["email_10k"]
-    admin_extra = max(0, clean_limits["max_admins"] - premium_plus.max_admins) * CUSTOM_ADDON_PRICES["admin"]
-    user_extra = max(0, clean_limits["max_users"] - premium_plus.max_users) * CUSTOM_ADDON_PRICES["user"]
-    smtp_extra = max(0, clean_limits["max_smtp_accounts"] - premium_plus.max_smtp_accounts) * CUSTOM_ADDON_PRICES["smtp_inbox"]
-    recipient_extra = max(0, ((clean_limits["max_recipients"] - premium_plus.max_recipients + 9999) // 10000)) * CUSTOM_ADDON_PRICES["recipient_10k"]
+    email_extra = max(0, ((clean_limits["email_limit"] - premium_plus.email_limit + 9999) // 10000)) * addon_prices["email_10k"]
+    admin_extra = max(0, clean_limits["max_admins"] - premium_plus.max_admins) * addon_prices["admin"]
+    user_extra = max(0, clean_limits["max_users"] - premium_plus.max_users) * addon_prices["user"]
+    smtp_extra = max(0, clean_limits["max_smtp_accounts"] - premium_plus.max_smtp_accounts) * addon_prices["smtp_inbox"]
+    recipient_extra = max(0, ((clean_limits["max_recipients"] - premium_plus.max_recipients + 9999) // 10000)) * addon_prices["recipient_10k"]
     extra_price = email_extra + admin_extra + user_extra + smtp_extra + recipient_extra
     original_price = base_price + extra_price
     discount_percent = custom_plan.discount_percent
@@ -60,7 +64,7 @@ def custom_pricing_preview(limits):
             "user_extra_bdt": user_extra,
             "smtp_inbox_extra_bdt": smtp_extra,
             "recipient_extra_bdt": recipient_extra,
-            "addon_prices": CUSTOM_ADDON_PRICES,
+            "addon_prices": addon_prices,
         },
         "email_limit": clean_limits["email_limit"],
         "daily_email_limit": 0,
@@ -74,6 +78,9 @@ def custom_pricing_preview(limits):
     return custom_plan, payable_price, snapshot
 
 
+from .oracle import calculate_native_amount, SYMBOL_BY_NETWORK, DECIMALS_BY_NATIVE_NETWORK
+
+
 def _populate_invoice_payment(invoice, network, billing_config):
     invoice.receiving_address = {
         "bsc": billing_config.payment_evm_wallet,
@@ -81,24 +88,48 @@ def _populate_invoice_payment(invoice, network, billing_config):
         "tron": billing_config.payment_tron_wallet,
         "ton": billing_config.payment_ton_wallet,
     }[network]
-    invoice.token_contract = {
-        "bsc": settings.USDT_BSC_CONTRACT,
-        "ethereum": settings.USDT_ETH_CONTRACT,
-        "tron": settings.USDT_TRON_CONTRACT,
-        "ton": settings.USDT_TON_MASTER,
-    }[network]
-    invoice.token_decimals = DECIMALS_BY_NETWORK[network]
+    
+    if getattr(invoice, "payment_asset", PaymentInvoice.PaymentAsset.USDT) == PaymentInvoice.PaymentAsset.NATIVE:
+        invoice.token_contract = ""
+        invoice.crypto_symbol = SYMBOL_BY_NETWORK[network]
+        invoice.token_decimals = DECIMALS_BY_NATIVE_NETWORK[network]
+    else:
+        invoice.token_contract = {
+            "bsc": settings.USDT_BSC_CONTRACT,
+            "ethereum": settings.USDT_ETH_CONTRACT,
+            "tron": settings.USDT_TRON_CONTRACT,
+            "ton": settings.USDT_TON_MASTER,
+        }[network]
+        invoice.crypto_symbol = "USDT"
+        invoice.token_decimals = DECIMALS_BY_NETWORK[network]
 
 
 def _reserve_unique_invoice_amount(invoice, billing_config):
+    if getattr(invoice, "payment_asset", PaymentInvoice.PaymentAsset.USDT) == PaymentInvoice.PaymentAsset.NATIVE:
+        crypto_amount, amount_raw, oracle_rate = calculate_native_amount(
+            invoice.price_bdt, invoice.network, billing_config.usdt_bdt_rate
+        )
+        invoice.id = uuid.uuid4()
+        invoice.crypto_amount = crypto_amount
+        invoice.amount_raw = Decimal(amount_raw)
+        invoice.oracle_usd_rate = oracle_rate
+        invoice.usdt_bdt_rate = billing_config.usdt_bdt_rate
+        invoice.amount_usdt = (Decimal(invoice.price_bdt) / Decimal(billing_config.usdt_bdt_rate)).quantize(Decimal("0.000001"))
+        invoice.rate_locked_until = timezone.now() + timedelta(minutes=15)
+        return
+
     for _ in range(20):
         invoice.id = uuid.uuid4()
         invoice.amount_usdt, invoice.usdt_bdt_rate = _quoted_amount(
             invoice.price_bdt, invoice.id, billing_config.usdt_bdt_rate,
         )
+        invoice.crypto_amount = invoice.amount_usdt
+        invoice.crypto_symbol = "USDT"
         invoice.amount_raw = amount_to_raw(invoice.amount_usdt, invoice.token_decimals)
         if not PaymentInvoice.objects.filter(
-            network=invoice.network, amount_usdt=invoice.amount_usdt,
+            network=invoice.network,
+            payment_asset=PaymentInvoice.PaymentAsset.USDT,
+            amount_usdt=invoice.amount_usdt,
             status__in=(PaymentInvoice.Status.PENDING, PaymentInvoice.Status.VERIFYING),
             expires_at__gt=timezone.now(),
         ).exists():
@@ -193,6 +224,10 @@ def create_custom_invoice(validated_data):
     plan, price_bdt, snapshot_limits = custom_pricing_preview(limits)
     network = validated_data["network"]
     billing_config = get_runtime_billing_configuration()
+    if price_bdt > billing_config.custom_plan_max_self_serve_price:
+        raise ValidationError({
+            "detail": f"Custom plan calculation of ৳{price_bdt:,} exceeds the instant self-serve ceiling of ৳{billing_config.custom_plan_max_self_serve_price:,}. Please request an enterprise quote."
+        })
     validated_data["customer_email"] = customer_email
     validated_data["normalized_customer_email"] = customer_email
     validated_data["normalized_organization_name"] = org_key

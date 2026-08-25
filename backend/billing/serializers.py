@@ -26,26 +26,42 @@ def validate_network_enabled(value):
 
 
 class PlanSerializer(serializers.ModelSerializer):
+    addon_prices = serializers.SerializerMethodField()
+
     class Meta:
         model = Plan
         fields = (
             "slug", "name", "original_price_bdt", "discount_percent", "price_bdt",
             "email_limit", "daily_email_limit", "weekly_email_limit", "max_admins",
             "max_users", "max_smtp_accounts", "is_free", "max_recipients",
-            "max_campaigns_per_day",
+            "max_campaigns_per_day", "is_featured", "badge_text", "button_text",
+            "features_list", "support_workspace_enabled", "display_order", "addon_prices",
         )
+
+    def get_addon_prices(self, obj):
+        from .configuration import get_runtime_billing_configuration
+
+        return get_runtime_billing_configuration().addon_prices
 
 
 class PlanAdminSerializer(serializers.ModelSerializer):
+    addon_prices = serializers.SerializerMethodField()
+
     class Meta:
         model = Plan
         fields = (
             "id", "slug", "name", "original_price_bdt", "discount_percent", "price_bdt",
             "email_limit", "daily_email_limit", "weekly_email_limit", "max_admins",
             "max_users", "max_smtp_accounts", "max_recipients", "max_campaigns_per_day",
-            "is_free", "is_active", "display_order",
+            "is_free", "is_active", "is_featured", "badge_text", "button_text",
+            "features_list", "support_workspace_enabled", "display_order", "addon_prices",
         )
-        read_only_fields = ("id", "price_bdt")
+        read_only_fields = ("id", "price_bdt", "addon_prices")
+
+    def get_addon_prices(self, obj):
+        from .configuration import get_runtime_billing_configuration
+
+        return get_runtime_billing_configuration().addon_prices
 
     def validate(self, attrs):
         is_free = attrs.get("is_free", getattr(self.instance, "is_free", False))
@@ -101,8 +117,7 @@ class RegistrationFieldsSerializer(serializers.Serializer):
         attrs["password_hash"] = make_password(attrs.pop("password"))
         return attrs
 
-
-class FreeSignupSerializer(RegistrationFieldsSerializer):
+class FreeSignupSerializer(RegistrationFieldsSerializer):
     plan_slug = serializers.SlugField(required=False, allow_blank=True)
     turnstile_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
@@ -110,6 +125,7 @@ class FreeSignupSerializer(RegistrationFieldsSerializer):
 class InvoiceCreateSerializer(RegistrationFieldsSerializer):
     plan_slug = serializers.SlugField()
     network = serializers.ChoiceField(choices=PaymentInvoice.Network.choices)
+    payment_asset = serializers.ChoiceField(choices=PaymentInvoice.PaymentAsset.choices, default=PaymentInvoice.PaymentAsset.USDT, required=False)
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
 
     def validate_plan_slug(self, value):
@@ -126,6 +142,7 @@ class InvoiceCreateSerializer(RegistrationFieldsSerializer):
         return create_invoice({
             "plan_slug": validated_data["plan_slug"],
             "network": validated_data["network"],
+            "payment_asset": validated_data.get("payment_asset", PaymentInvoice.PaymentAsset.USDT),
             "customer_name": validated_data["name"],
             "customer_email": validated_data["email"],
             "organization_name": validated_data["organization_name"],
@@ -144,6 +161,7 @@ class CustomLimitsSerializer(serializers.Serializer):
 
 class CustomInvoiceCreateSerializer(RegistrationFieldsSerializer):
     network = serializers.ChoiceField(choices=PaymentInvoice.Network.choices)
+    payment_asset = serializers.ChoiceField(choices=PaymentInvoice.PaymentAsset.choices, default=PaymentInvoice.PaymentAsset.USDT, required=False)
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
     limits = CustomLimitsSerializer()
 
@@ -165,6 +183,7 @@ class CustomInvoiceCreateSerializer(RegistrationFieldsSerializer):
 
         return create_custom_invoice({
             "network": validated_data["network"],
+            "payment_asset": validated_data.get("payment_asset", PaymentInvoice.PaymentAsset.USDT),
             "customer_name": validated_data["name"],
             "customer_email": validated_data["email"],
             "organization_name": validated_data["organization_name"],
@@ -177,6 +196,7 @@ class CustomInvoiceCreateSerializer(RegistrationFieldsSerializer):
 class AccountInvoiceCreateSerializer(serializers.Serializer):
     plan_slug = serializers.SlugField()
     network = serializers.ChoiceField(choices=PaymentInvoice.Network.choices)
+    payment_asset = serializers.ChoiceField(choices=PaymentInvoice.PaymentAsset.choices, default=PaymentInvoice.PaymentAsset.USDT, required=False)
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
 
     def validate_plan_slug(self, value):
@@ -195,6 +215,7 @@ class AccountInvoiceCreateSerializer(serializers.Serializer):
         return create_invoice({
             "plan_slug": validated_data["plan_slug"],
             "network": validated_data["network"],
+            "payment_asset": validated_data.get("payment_asset", PaymentInvoice.PaymentAsset.USDT),
             "organization": user.organization,
             "customer_name": user.name or user.get_full_name() or user.username,
             "customer_email": user.email,
@@ -206,6 +227,7 @@ class AccountInvoiceCreateSerializer(serializers.Serializer):
 
 class AccountCustomInvoiceCreateSerializer(serializers.Serializer):
     network = serializers.ChoiceField(choices=PaymentInvoice.Network.choices)
+    payment_asset = serializers.ChoiceField(choices=PaymentInvoice.PaymentAsset.choices, default=PaymentInvoice.PaymentAsset.USDT, required=False)
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
     limits = CustomLimitsSerializer()
 
@@ -227,6 +249,7 @@ class AccountCustomInvoiceCreateSerializer(serializers.Serializer):
         user = self.context["request"].user
         return create_custom_invoice({
             "network": validated_data["network"],
+            "payment_asset": validated_data.get("payment_asset", PaymentInvoice.PaymentAsset.USDT),
             "organization": user.organization,
             "customer_name": user.name or user.get_full_name() or user.username,
             "customer_email": user.email,
@@ -245,12 +268,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentInvoice
         fields = (
-            "id", "plan", "network", "receiving_address", "token_contract", "price_bdt",
-            "usdt_bdt_rate", "amount_usdt", "status", "transaction_hash", "verification_error",
-            "expires_at", "verified_at", "created_at", "explorer_url", "replaced_by", "snapshot_limits",
-            "invoice_email_sent_at", "invoice_email_error", "recovery_email_sent_at",
-            "recovery_email_error", "confirmation_email_sent_at", "confirmation_email_error",
-            "manual_review_email_sent_at", "manual_review_email_error",
+            "id", "plan", "network", "payment_asset", "crypto_symbol", "crypto_amount",
+            "oracle_usd_rate", "rate_locked_until", "receiving_address", "token_contract",
+            "price_bdt", "usdt_bdt_rate", "amount_usdt", "status", "transaction_hash",
+            "verification_error", "expires_at", "verified_at", "created_at", "explorer_url",
+            "replaced_by", "snapshot_limits", "invoice_email_sent_at", "invoice_email_error",
+            "recovery_email_sent_at", "recovery_email_error", "confirmation_email_sent_at",
+            "confirmation_email_error", "manual_review_email_sent_at", "manual_review_email_error",
         )
         read_only_fields = fields
 
@@ -270,8 +294,12 @@ class TransactionSubmissionSerializer(serializers.Serializer):
     transaction = serializers.CharField(max_length=500)
 
 
-class BscTransactionInspectSerializer(serializers.Serializer):
+class BlockchainTransactionInspectSerializer(serializers.Serializer):
+    network = serializers.ChoiceField(choices=["bsc", "ethereum", "tron", "ton"], default="bsc", required=False)
     transaction = serializers.CharField(max_length=500)
+
+
+BscTransactionInspectSerializer = BlockchainTransactionInspectSerializer
 
 
 class CheckoutEmailStartSerializer(serializers.Serializer):

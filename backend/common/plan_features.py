@@ -16,6 +16,8 @@ def organization_has_support_workspace_plan(organization):
     plan = organization_plan(organization)
     if not plan:
         return False
+    if getattr(plan, "support_workspace_enabled", False):
+        return True
     slug = (plan.slug or "").strip().lower()
     name = (plan.name or "").strip().lower()
     return slug in SUPPORT_WORKSPACE_PLAN_SLUGS or name in SUPPORT_WORKSPACE_PLAN_NAMES

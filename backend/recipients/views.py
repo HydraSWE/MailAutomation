@@ -123,7 +123,7 @@ class RecipientListViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         # Quota metadata for Lead Hunter
         sub = getattr(organization, "subscription", None)
         plan = getattr(sub, "plan", None) if sub else None
-        max_recipients = getattr(plan, "max_recipients", 10000) if plan else 10000
+        max_recipients = int(getattr(organization, "max_recipients", 0) or (getattr(plan, "max_recipients", 0) if plan else 0))
         current_total_recipients = Recipient.objects.filter(organization=organization).count()
         available_slots = max(0, max_recipients - current_total_recipients)
 
@@ -131,12 +131,12 @@ class RecipientListViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             "ok": True,
             "results": results,
             "quota": {
-                "plan_name": getattr(plan, "name", "Pro") if plan else "Pro",
+                "plan_name": getattr(plan, "name", "Current Plan") if plan else "Standard",
                 "plan_status": getattr(sub, "status", "active") if sub else "active",
                 "max_recipients": max_recipients,
                 "current_recipients": current_total_recipients,
                 "available_slots": available_slots,
-                "max_batch_limit": min(500, max(50, available_slots)),
+                "max_batch_limit": min(1000, max(50, available_slots)) if available_slots > 0 else 0,
             }
         })
 
@@ -222,9 +222,19 @@ class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         # Quota verification
         sub = getattr(organization, "subscription", None)
         plan = getattr(sub, "plan", None) if sub else None
-        max_recipients = getattr(plan, "max_recipients", 10000) if plan else 10000
+        max_recipients = int(getattr(organization, "max_recipients", 0) or (getattr(plan, "max_recipients", 0) if plan else 0))
         current_total_recipients = Recipient.objects.filter(organization=organization).count()
         available_slots = max(0, max_recipients - current_total_recipients)
+
+        if max_recipients <= 0:
+            return Response({
+                "ok": False,
+                "error": "No active recipient quota assigned to your organization. Please upgrade your plan or contact support.",
+                "quota_exceeded": True,
+                "max_recipients": 0,
+                "current_recipients": current_total_recipients,
+                "available_slots": 0,
+            }, status=status.HTTP_403_FORBIDDEN)
 
         if available_slots <= 0:
             plan_title = getattr(plan, "name", "Current") if plan else "Current"

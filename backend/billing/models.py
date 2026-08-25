@@ -26,6 +26,11 @@ class Plan(models.Model):
     max_campaigns_per_day = models.PositiveIntegerField(default=10)
     is_free = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
+    badge_text = models.CharField(max_length=50, blank=True, default="")
+    button_text = models.CharField(max_length=50, blank=True, default="")
+    features_list = models.JSONField(default=list, blank=True)
+    support_workspace_enabled = models.BooleanField(default=False)
     display_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
@@ -77,6 +82,10 @@ class PaymentInvoice(models.Model):
         TRON = "tron", "Tron"
         TON = "ton", "TON"
 
+    class PaymentAsset(models.TextChoices):
+        USDT = "usdt", "USDT (Stablecoin)"
+        NATIVE = "native", "Native Token (BNB, TRX, GRAM, ETH)"
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         PAYMENT_DETECTED = "payment_detected", "Payment detected"
@@ -106,8 +115,13 @@ class PaymentInvoice(models.Model):
     normalized_customer_email = models.EmailField(blank=True, db_index=True)
     normalized_organization_name = models.CharField(max_length=255, blank=True, db_index=True)
     network = models.CharField(max_length=16, choices=Network.choices)
+    payment_asset = models.CharField(max_length=16, choices=PaymentAsset.choices, default=PaymentAsset.USDT)
+    crypto_symbol = models.CharField(max_length=10, default="USDT")
+    crypto_amount = models.DecimalField(max_digits=28, decimal_places=18, default=Decimal("0"))
+    oracle_usd_rate = models.DecimalField(max_digits=16, decimal_places=6, null=True, blank=True)
+    rate_locked_until = models.DateTimeField(null=True, blank=True)
     receiving_address = models.CharField(max_length=128)
-    token_contract = models.CharField(max_length=128)
+    token_contract = models.CharField(max_length=128, blank=True, default="")
     price_bdt = models.PositiveIntegerField()
     usdt_bdt_rate = models.DecimalField(max_digits=12, decimal_places=4)
     amount_usdt = models.DecimalField(max_digits=20, decimal_places=6)

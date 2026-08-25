@@ -5,7 +5,11 @@ from .turnstile import verify_turnstile
 def apply_plan_to_organization(organization, plan, *, activate=True):
     plan_key = (plan.slug or "").strip().lower()
     plan_name = (plan.name or "").strip().lower()
-    support_workspace_plan = plan_key in {"premium-plus", "custom"} or plan_name in {"premium+", "premium plus", "custom"}
+    support_workspace_plan = (
+        getattr(plan, "support_workspace_enabled", False)
+        or plan_key in {"premium-plus", "custom"}
+        or plan_name in {"premium+", "premium plus", "custom"}
+    )
     organization.max_admins = plan.max_admins
     organization.max_users = plan.max_users
     organization.max_smtp_accounts = plan.max_smtp_accounts
@@ -14,12 +18,11 @@ def apply_plan_to_organization(organization, plan, *, activate=True):
     organization.monthly_email_limit = plan.email_limit
     organization.max_recipients = plan.max_recipients
     organization.max_campaigns_per_day = plan.max_campaigns_per_day
-    if not support_workspace_plan:
-        organization.support_workspace_enabled = False
+    organization.support_workspace_enabled = support_workspace_plan
     update_fields = [
         "max_admins", "max_users", "max_smtp_accounts", "daily_email_limit",
         "weekly_email_limit", "monthly_email_limit", "max_recipients",
-        "max_campaigns_per_day", "updated_at",
+        "max_campaigns_per_day", "support_workspace_enabled", "updated_at",
     ]
     if not support_workspace_plan:
         update_fields.append("support_workspace_enabled")

@@ -42,6 +42,7 @@ class PlatformLeadHunterLicensesView(APIView):
         try:
             from users.models import User
             from datetime import date, timedelta
+            from billing.models import Plan
             active_users = User.objects.filter(is_active=True).exclude(email="").select_related("organization", "organization__subscription", "organization__subscription__plan")
             
             for user in active_users:
@@ -54,14 +55,16 @@ class PlatformLeadHunterLicensesView(APIView):
                         sub = None
 
                 today = date.today()
+                plan_obj = sub.plan if sub and sub.plan else None
+                plan_name = plan_obj.name if plan_obj else "Custom"
+                max_rec = int(getattr(user.organization, "max_recipients", 0) or (plan_obj.max_recipients if plan_obj else 0))
+
                 if sub and sub.current_period_end:
                     expiry_date = sub.current_period_end.date()
-                    plan_name = sub.plan.name if sub.plan else "Pro"
                     status_str = "active" if sub.status == "active" and expiry_date >= today else "expired"
                 else:
                     join_date = user.date_joined.date() if user.date_joined else today
                     expiry_date = join_date + timedelta(days=30)
-                    plan_name = "Pro"
                     status_str = "active" if expiry_date >= today else "expired"
 
                 days_remaining = max(1, (expiry_date - today).days)
@@ -69,7 +72,7 @@ class PlatformLeadHunterLicensesView(APIView):
                 today_str = (user.date_joined.date() if user.date_joined else today).isoformat()
 
                 if u_email not in existing_emails:
-                    # Provision into relay with exact subscription expiry
+                    # Provision into relay with exact subscription expiry and recipient quota
                     try:
                         requests.post(
                             url,
@@ -78,7 +81,8 @@ class PlatformLeadHunterLicensesView(APIView):
                                 "email": u_email,
                                 "plan": plan_name,
                                 "days": days_remaining,
-                                "expires_at": expiry_str
+                                "expires_at": expiry_str,
+                                "max_recipients": max_rec,
                             },
                             headers={"Content-Type": "application/json", "X-Mail-Flow-Secret": secret},
                             timeout=5
@@ -93,6 +97,8 @@ class PlatformLeadHunterLicensesView(APIView):
                         "licenseKey": f"MF-LH-AUTO-{str(user.id).zfill(4)}-{plan_name.upper().replace(' ', '')}",
                         "status": status_str,
                         "plan": plan_name,
+                        "maxRecipients": max_rec,
+                        "max_recipients": max_rec,
                         "issuedAt": today_str,
                         "expiresAt": expiry_str,
                         "deviceLocked": False,
@@ -106,35 +112,27 @@ class PlatformLeadHunterLicensesView(APIView):
         if relay_licenses:
             return Response({"results": relay_licenses})
 
-        # Fallback local data if relay is empty
-        return Response({
-            "results": [
-                {
-                    "id": 1,
-                    "email": "sheikhrajrayhan@gmail.com",
-                    "licenseKey": "MF-LH-8821-X9A2-7710",
-                    "status": "active",
-                    "plan": "Pro",
-                    "issuedAt": "2026-08-20",
-                    "expiresAt": "2026-09-19",
-                    "deviceLocked": True,
-                    "deviceId": "DESKTOP-WIN11-99812",
-                    "totalExtracted": 3420,
-                }
-            ]
-        })
+        return Response({"results": []})
 
     def post(self, request):
         """Issue or provision a new Lead Hunter license key."""
+        from billing.models import Plan
+        from django.db.models import Q
+
         email = (request.data.get("email") or "").strip().lower()
         days = int(request.data.get("days", 30))
-        plan = (request.data.get("plan") or "Pro").strip()
+        plan = (request.data.get("plan") or "Custom").strip()
         max_recipients = request.data.get("max_recipients") or request.data.get("maxRecipients")
         max_batch_limit = request.data.get("max_batch_limit") or request.data.get("maxBatchLimit")
         license_key = request.data.get("licenseKey")
 
         if not email or "@" not in email:
             return Response({"detail": "A valid email address is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not max_recipients:
+            db_plan = Plan.objects.filter(Q(name__iexact=plan) | Q(slug__iexact=plan)).first()
+            if db_plan:
+                max_recipients = db_plan.max_recipients
 
         url, secret = get_relay_credentials()
         try:

@@ -22,6 +22,7 @@ import {
   Zap
 } from "lucide-react";
 import CustomSelect from "../../components/common/CustomSelect";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import api from "../../services/api";
 import { apiError } from "../../utils/apiError";
 
@@ -40,20 +41,6 @@ const durationOptions = [
   { value: "365", label: "365 Days (1 Year Agency)" }
 ];
 
-const planPresets = {
-  Starter: { maxRecipients: 2500, maxBatchLimit: 250 },
-  Pro: { maxRecipients: 10000, maxBatchLimit: 500 },
-  Enterprise: { maxRecipients: 50000, maxBatchLimit: 1000 },
-  Custom: { maxRecipients: 25000, maxBatchLimit: 500 }
-};
-
-const planOptions = [
-  { value: "Starter", label: "Starter Tier (2,500 Rec / 250 Batch)" },
-  { value: "Pro", label: "Pro Tier (10,000 Rec / 500 Batch)" },
-  { value: "Enterprise", label: "Enterprise Tier (50,000 Rec / 1,000 Batch)" },
-  { value: "Custom", label: "Custom Quotas & Limits" }
-];
-
 function generateRandomKey() {
   const segment = () => Math.random().toString(36).substring(2, 6).toUpperCase();
   return `MF-LH-${segment()}-${segment()}-${segment()}`;
@@ -61,12 +48,22 @@ function generateRandomKey() {
 
 export default function PlatformLeadHunter() {
   const [licenses, setLicenses] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [copiedKey, setCopiedKey] = useState(null);
   const [notice, setNotice] = useState(null);
+
+  // Dynamic plan options from DB plans
+  const planOptions = useMemo(() => {
+    const base = plans.map((p) => ({
+      value: p.name,
+      label: `${p.name} Tier (${(p.max_recipients || 0).toLocaleString()} Rec / ${Math.min(1000, Math.max(100, Math.floor((p.max_recipients || 10000) / 20))).toLocaleString()} Batch)`,
+    }));
+    return [...base, { value: "Custom", label: "Custom Quotas & Limits" }];
+  }, [plans]);
 
   // Create Modal State
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -84,46 +81,67 @@ export default function PlatformLeadHunter() {
   const [editMaxRecipients, setEditMaxRecipients] = useState("10000");
   const [editMaxBatchLimit, setEditMaxBatchLimit] = useState("500");
 
-  // Load licenses from API
-  const loadLicenses = async () => {
+  // Load licenses and plans from API
+  const loadData = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/billing/platform/lead-hunter/licenses/");
-      setLicenses(res.data.results || res.data || []);
+      const [licRes, planRes] = await Promise.allSettled([
+        api.get("/billing/platform/lead-hunter/licenses/"),
+        api.get("/billing/platform/plans/"),
+      ]);
+
+      if (licRes.status === "fulfilled") {
+        setLicenses(licRes.value.data.results || licRes.value.data || []);
+      }
+      if (planRes.status === "fulfilled") {
+        const loadedPlans = planRes.value.data.results || planRes.value.data || [];
+        setPlans(loadedPlans);
+        if (loadedPlans.length > 0) {
+          const defaultPlan = loadedPlans.find((p) => p.name.toLowerCase() === "premium" || p.name.toLowerCase() === "pro") || loadedPlans[0];
+          setNewPlan(defaultPlan.name);
+          setNewMaxRecipients(String(defaultPlan.max_recipients || 10000));
+          setNewMaxBatchLimit(String(Math.min(1000, Math.max(100, Math.floor((defaultPlan.max_recipients || 10000) / 20)))));
+        }
+      }
     } catch (err) {
-      console.warn("Failed to load Lead Hunter licenses:", err);
+      console.warn("Failed to load Lead Hunter data:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadLicenses();
+    loadData();
   }, []);
 
   // Sync presets on plan change in create modal
   function handleNewPlanChange(val) {
     setNewPlan(val);
-    if (planPresets[val]) {
-      setNewMaxRecipients(String(planPresets[val].maxRecipients));
-      setNewMaxBatchLimit(String(planPresets[val].maxBatchLimit));
+    const matched = plans.find((p) => p.name.toLowerCase() === val.toLowerCase() || p.slug.toLowerCase() === val.toLowerCase());
+    if (matched) {
+      const rec = Number(matched.max_recipients || 10000);
+      setNewMaxRecipients(String(rec));
+      setNewMaxBatchLimit(String(Math.min(1000, Math.max(100, Math.floor(rec / 20)))));
     }
   }
 
   // Sync presets on plan change in edit modal
   function handleEditPlanChange(val) {
     setEditPlan(val);
-    if (planPresets[val]) {
-      setEditMaxRecipients(String(planPresets[val].maxRecipients));
-      setEditMaxBatchLimit(String(planPresets[val].maxBatchLimit));
+    const matched = plans.find((p) => p.name.toLowerCase() === val.toLowerCase() || p.slug.toLowerCase() === val.toLowerCase());
+    if (matched) {
+      const rec = Number(matched.max_recipients || 10000);
+      setEditMaxRecipients(String(rec));
+      setEditMaxBatchLimit(String(Math.min(1000, Math.max(100, Math.floor(rec / 20)))));
     }
   }
 
   function openEditLimitsModal(lic) {
     setEditingLic(lic);
-    setEditPlan(lic.plan || "Pro");
-    setEditMaxRecipients(String(lic.maxRecipients || lic.max_recipients || 10000));
-    setEditMaxBatchLimit(String(lic.maxBatchLimit || lic.max_batch_limit || 500));
+    const currentPlan = lic.plan || "Custom";
+    setEditPlan(currentPlan);
+    setEditMaxRecipients(String(lic.maxRecipients ?? lic.max_recipients ?? 10000));
+    setEditMaxBatchLimit(String(lic.maxBatchLimit ?? lic.max_batch_limit ?? 500));
     setEditModalOpen(true);
   }
 
@@ -224,17 +242,29 @@ export default function PlatformLeadHunter() {
     setTimeout(() => setNotice(null), 4000);
   }
 
+  // Delete Confirmation State
+  const [confirmDeleteLic, setConfirmDeleteLic] = useState(null);
+  const [deletingLic, setDeletingLic] = useState(false);
+
   // Delete / Revoke License
-  async function deleteLicense(lic) {
-    if (!confirm(`Are you sure you want to revoke and delete the license for ${lic.email}?`)) return;
+  function deleteLicense(lic) {
+    setConfirmDeleteLic(lic);
+  }
+
+  async function handleConfirmDeleteLicense() {
+    if (!confirmDeleteLic) return;
+    setDeletingLic(true);
     try {
-      await api.post(`/billing/platform/lead-hunter/licenses/${lic.licenseKey}/action/`, {
+      await api.post(`/billing/platform/lead-hunter/licenses/${confirmDeleteLic.licenseKey}/action/`, {
         action: "delete"
       });
-      setLicenses(prev => prev.filter(item => item.id !== lic.id));
+      setLicenses(prev => prev.filter(item => item.id !== confirmDeleteLic.id));
       setNotice({ type: "success", text: "License key revoked successfully." });
     } catch (err) {
       setNotice({ type: "error", text: apiError(err, "Failed to revoke license.") });
+    } finally {
+      setDeletingLic(false);
+      setConfirmDeleteLic(null);
     }
     setTimeout(() => setNotice(null), 4000);
   }
@@ -243,7 +273,8 @@ export default function PlatformLeadHunter() {
   async function handleCreateLicense(e) {
     e.preventDefault();
     if (!newEmail || !newEmail.includes("@")) {
-      alert("Please provide a valid customer email.");
+      setNotice({ type: "error", text: "Please provide a valid customer email address." });
+      setTimeout(() => setNotice(null), 4000);
       return;
     }
 
@@ -910,6 +941,18 @@ export default function PlatformLeadHunter() {
           </div>
         </div>
       )}
+
+      {/* Revoke / Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteLic)}
+        title="Revoke License"
+        message={`Are you sure you want to revoke and delete the license for ${confirmDeleteLic?.email}?`}
+        confirmLabel="Revoke License"
+        isDanger
+        loading={deletingLic}
+        onCancel={() => setConfirmDeleteLic(null)}
+        onConfirm={handleConfirmDeleteLicense}
+      />
     </div>
   );
 }

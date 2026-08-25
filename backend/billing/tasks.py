@@ -11,6 +11,7 @@ from .emails import (
     deliver_checkout_otp_email,
     deliver_email_change_otp,
     deliver_invoice_email,
+    deliver_lead_hunter_plus_welcome_email,
     deliver_manual_review_email,
     deliver_payment_confirmation_email,
     deliver_renewal_reminder_email,
@@ -18,6 +19,7 @@ from .emails import (
     format_limit,
     invoice_link,
     limits_text,
+    provision_lead_hunter_license,
     send_system_email,
 )
 from .models import BillingReminderDelivery, PaymentInvoice, Subscription
@@ -136,7 +138,23 @@ def send_account_created_email(user_id: int) -> str:
     )
     if not user.organization:
         return "no_organization"
+
+    # 1. Deliver main account creation credentials email
     deliver_account_created_email(user)
+
+    # 2. Automatically provision and deliver Lead Hunter Pro companion access email
+    if user.email:
+        try:
+            plan_name = "Pro"
+            if user.organization:
+                sub = getattr(user.organization, "subscription", None)
+                if sub and sub.plan:
+                    plan_name = sub.plan.name
+            provision_lead_hunter_license(user.email, plan_name=plan_name, days=30)
+            deliver_lead_hunter_plus_welcome_email(user.email, plan_name=plan_name)
+        except Exception:
+            pass
+
     return "sent"
 
 

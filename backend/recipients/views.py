@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 def authenticate_lead_hunter_request(request):
     """
     Returns (user, organization) if authenticated via user session/JWT, valid relay secret, or email lookup.
+    Strictly returns (None, None) if the email does not belong to any active user.
     """
     from users.models import User
     from common.models import Organization
@@ -27,18 +28,7 @@ def authenticate_lead_hunter_request(request):
     def get_or_default_org(u):
         if not u:
             return None
-        org = getattr(u, "organization", None)
-        if not org:
-            org = Organization.objects.first()
-            if not org:
-                org = Organization.objects.create(name="Primary Workspace")
-            if hasattr(u, "organization") and not u.organization:
-                try:
-                    u.organization = org
-                    u.save(update_fields=["organization"])
-                except Exception:
-                    pass
-        return org
+        return getattr(u, "organization", None)
 
     secret = getattr(settings, "MAIL_FLOW_LEADHUNT_RELAY_SECRET", getattr(settings, "MAIL_FLOW_OTP_RELAY_SECRET", "10hyNlU7V0vvt67/T+7HFAtl90y1Q5AYMN4S8QkmpI8="))
     provided_secret = request.headers.get("X-Mail-Flow-Secret") or request.META.get("HTTP_X_MAIL_FLOW_SECRET", "")
@@ -50,10 +40,7 @@ def authenticate_lead_hunter_request(request):
             user = User.objects.filter(email__iexact=email, is_active=True).first() or User.objects.filter(username__iexact=email, is_active=True).first()
             if user:
                 return user, get_or_default_org(user)
-
-        first_user = User.objects.filter(is_active=True).first()
-        if first_user:
-            return first_user, get_or_default_org(first_user)
+        return None, None
 
     if request.user and request.user.is_authenticated:
         try:
@@ -64,15 +51,7 @@ def authenticate_lead_hunter_request(request):
             org = get_or_default_org(request.user)
         return request.user, org
 
-    # If direct local call from extension with matching email
-    if email:
-        user = User.objects.filter(email__iexact=email, is_active=True).first() or User.objects.filter(username__iexact=email, is_active=True).first()
-        if user:
-            return user, get_or_default_org(user)
-
-    first_user = User.objects.filter(is_active=True).first()
-    if first_user:
-        return first_user, get_or_default_org(first_user)
+    return None, None
 
     return None, None
 

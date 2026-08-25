@@ -36,23 +36,25 @@ function sendJson(array $data, int $statusCode = 200): void {
     exit;
 }
 
-// Global exception/fatal error handler
+// Global exception/fatal error handler (Sanitized - no stack traces/SQL exposed)
 set_exception_handler(function (\Throwable $e) {
+    error_log("MailFlow Relay Exception: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     sendJson([
         'ok' => false,
         'status' => 'error',
-        'error' => 'Server Error: ' . $e->getMessage() . ' on line ' . $e->getLine()
-    ], 200);
+        'error' => 'A server error occurred. Please try again later.'
+    ], 500);
 });
 
 register_shutdown_function(function () {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        error_log("MailFlow Relay Fatal: " . $error['message'] . " in " . $error['file'] . " on line " . $error['line']);
         sendJson([
             'ok' => false,
             'status' => 'fatal_error',
-            'error' => 'Fatal Error: ' . $error['message'] . ' on line ' . $error['line']
-        ], 200);
+            'error' => 'An internal service error occurred. Please contact support.'
+        ], 500);
     }
 });
 
@@ -182,18 +184,57 @@ function getPlanLimits(?string $planName = 'Pro', ?array $licenseRow = null): ar
     return ['name' => 'Pro', 'max_recipients' => 10000, 'max_batch_limit' => 500];
 }
 
+function getLiveRecipientCount(PDO $pdo, string $email, string $secret): int {
+    $email = strtolower(trim($email));
+    if (empty($email)) return 0;
+
+    // 1. Try Live Django API summary
+    $djangoRes = callDjangoMailFlowApi('/api/recipient-lists/summary/?email=' . urlencode($email), [], 'GET', $secret);
+    if ($djangoRes && isset($djangoRes['quota']['current_recipients'])) {
+        return (int)$djangoRes['quota']['current_recipients'];
+    }
+
+    // 2. Try Django Database Tables
+    try {
+        $uStmt = $pdo->prepare("SELECT organization_id FROM `users_user` WHERE LOWER(`email`) = :email LIMIT 1");
+        $uStmt->execute([':email' => $email]);
+        $orgId = $uStmt->fetchColumn();
+        if ($orgId) {
+            $cnt = $pdo->prepare("SELECT COUNT(*) FROM `recipients_recipient` WHERE `organization_id` = :org");
+            $cnt->execute([':org' => $orgId]);
+            return (int)$cnt->fetchColumn();
+        }
+    } catch (\Throwable $e) {}
+
+    // 3. Fallback to Standalone Table
+    try {
+        $cnt = $pdo->prepare("SELECT COUNT(*) FROM `recipients` WHERE LOWER(`owner_email`) = :email");
+        $cnt->execute([':email' => $email]);
+        return (int)$cnt->fetchColumn();
+    } catch (\Throwable $e) {}
+
+    return 0;
+}
+
 // ----------------------------------------------------
 // Cryptographic JWT Helpers
 // ----------------------------------------------------
-function createJwtToken(string $email, string $deviceId, string $plan, ?array $quota, string $secret): string {
+function createJwtToken(string $email, string $deviceId, string $plan, ?array $quota, string $secret, ?string $expireDate = null): string {
     $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
+
+    $exp = !empty($expireDate) ? strtotime($expireDate . (strlen($expireDate) === 10 ? ' 23:59:59' : '')) : null;
+    if (!$exp || $exp <= 0) {
+        $exp = time() + (86400 * 30); // fallback 30 days
+    }
+
     $payload = json_encode([
         'sub' => strtolower($email),
         'device_id' => $deviceId,
         'plan' => $plan,
         'quota' => $quota,
         'iat' => time(),
-        'exp' => time() + (86400 * 30) // 30 days
+        'exp' => $exp,
+        'expire_date' => $expireDate ?: date('Y-m-d', $exp)
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
     $b64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
@@ -322,6 +363,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt->execute([':q1' => strtolower($query), ':q2' => strtolower($query)]);
     $lic = $stmt->fetch();
 
+    if ($lic && str_starts_with((string)($lic['license_key'] ?? ''), 'MF-LH-')) {
+        $djangoCheck = callDjangoMailFlowApi('/api/recipient-lists/summary/?email=' . urlencode((string)$lic['email']), [], 'GET', $relaySecret);
+        if (!$djangoCheck || (isset($djangoCheck['ok']) && $djangoCheck['ok'] === false) || empty($djangoCheck['quota'])) {
+            $del = $pdo->prepare("DELETE FROM `licenses` WHERE `id` = :id");
+            $del->execute([':id' => $lic['id']]);
+            $delDev = $pdo->prepare("DELETE FROM `license_devices` WHERE `license_id` = :id");
+            $delDev->execute([':id' => $lic['id']]);
+            $lic = null;
+        }
+    }
+
     if (!$lic) {
         sendJson(['ok' => false, 'status' => 'not_found', 'error' => 'No active Lead Hunter subscription found for this account.'], 404);
     }
@@ -353,9 +405,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
     }
 
-    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `recipients` WHERE LOWER(`owner_email`) = :email");
-    $cntStmt->execute([':email' => strtolower($lic['email'])]);
-    $currentRecipientsCount = (int)$cntStmt->fetchColumn();
+    $currentRecipientsCount = getLiveRecipientCount($pdo, (string)$lic['email'], $relaySecret);
 
     $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
     $maxRecipients = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
@@ -371,7 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'max_batch_limit' => min($maxBatchLimit, max(20, $availableSlots)),
     ];
 
-    $token = createJwtToken($lic['email'], $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret);
+    $token = createJwtToken($lic['email'], $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret, $lic['expires_at'] ?? null);
 
     sendJson([
         'ok' => true,
@@ -417,8 +467,49 @@ if ($action === 'activate_license') {
     $stmt->execute([':email' => $email]);
     $lic = $stmt->fetch();
 
+    // Re-verify auto-provisioned licenses against Django to invalidate test rows
+    if ($lic && str_starts_with((string)($lic['license_key'] ?? ''), 'MF-LH-')) {
+        $djangoCheck = callDjangoMailFlowApi('/api/recipient-lists/summary/?email=' . urlencode($email), [], 'GET', $relaySecret);
+        if (!$djangoCheck || (isset($djangoCheck['ok']) && $djangoCheck['ok'] === false) || empty($djangoCheck['quota'])) {
+            $del = $pdo->prepare("DELETE FROM `licenses` WHERE `id` = :id");
+            $del->execute([':id' => $lic['id']]);
+            $delDev = $pdo->prepare("DELETE FROM `license_devices` WHERE `license_id` = :id");
+            $delDev->execute([':id' => $lic['id']]);
+            $lic = null;
+        }
+    }
+
     if (!$lic) {
-        // Auto-provision 30 days active license
+        // 1. Verify with Django REST API (mailflow.annomous.com)
+        $isDjangoUser = false;
+        $djangoRes = callDjangoMailFlowApi('/api/recipient-lists/summary/?email=' . urlencode($email), [], 'GET', $relaySecret);
+        if ($djangoRes && isset($djangoRes['quota']) && (!isset($djangoRes['ok']) || $djangoRes['ok'] !== false)) {
+            $isDjangoUser = true;
+        }
+
+        // 2. Check local database table if present
+        if (!$isDjangoUser) {
+            try {
+                $userStmt = $pdo->prepare("SELECT id, organization_id, is_active FROM `users_user` WHERE LOWER(`email`) = :email LIMIT 1");
+                $userStmt->execute([':email' => $email]);
+                $djangoUser = $userStmt->fetch();
+                if ($djangoUser && (!isset($djangoUser['is_active']) || $djangoUser['is_active'])) {
+                    $isDjangoUser = true;
+                }
+            } catch (\Throwable $e) {
+                // Standalone DB mode - table users_user not in same MySQL instance
+            }
+        }
+
+        if (!$isDjangoUser) {
+            sendJson([
+                'ok' => false,
+                'status' => 'not_found',
+                'error' => 'Account not found. ' . $email . ' is not registered in any Mail Flow organization. Please sign up at mail-flow.annomous.com first.'
+            ], 403);
+        }
+
+        // Verified member of organization -> Link license
         $autoKey = sprintf('MF-LH-%s-%s-%s', strtoupper(bin2hex(random_bytes(2))), strtoupper(bin2hex(random_bytes(2))), strtoupper(bin2hex(random_bytes(2))));
         $issuedAt = date('Y-m-d');
         $expiresAt = date('Y-m-d', strtotime('+30 days'));
@@ -447,9 +538,7 @@ if ($action === 'activate_license') {
             registerDeviceForLicense($pdo, $licId, $email, $deviceId);
         }
 
-        $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `recipients` WHERE LOWER(`owner_email`) = :email");
-        $cntStmt->execute([':email' => $email]);
-        $currentRecipients = (int)$cntStmt->fetchColumn();
+        $currentRecipients = getLiveRecipientCount($pdo, $email, $relaySecret);
 
         $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
         $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
@@ -465,7 +554,7 @@ if ($action === 'activate_license') {
             'max_batch_limit' => min($maxBatch, max(20, $avail)),
         ];
 
-        $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret);
+        $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret, $lic['expires_at'] ?? null);
 
         sendJson([
             'ok' => true,
@@ -582,9 +671,7 @@ if ($action === 'verify_device_otp') {
     $licId = (int)$lic['id'];
     evictOldestDeviceAndAdd($pdo, $licId, $email, $deviceId);
 
-    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `recipients` WHERE LOWER(`owner_email`) = :email");
-    $cntStmt->execute([':email' => $email]);
-    $currentRecipients = (int)$cntStmt->fetchColumn();
+    $currentRecipients = getLiveRecipientCount($pdo, $email, $relaySecret);
 
     $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
     $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
@@ -600,7 +687,7 @@ if ($action === 'verify_device_otp') {
         'max_batch_limit' => min($maxBatch, max(20, $avail)),
     ];
 
-    $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret);
+    $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret, $lic['expires_at'] ?? null);
 
     sendJson([
         'ok' => true,
@@ -617,7 +704,7 @@ if ($action === 'verify_device_otp') {
 // ACTION: heartbeat (Periodic Token Health Check)
 // ----------------------------------------------------
 if ($action === 'heartbeat') {
-    $token = $bearerToken;
+    $token = !empty($bearerToken) ? $bearerToken : trim($input['token'] ?? '');
     $email = strtolower(trim($input['email'] ?? ''));
     $deviceId = trim($input['deviceId'] ?? $input['device_id'] ?? '');
 
@@ -636,18 +723,20 @@ if ($action === 'heartbeat') {
         sendJson(['ok' => false, 'status' => 'expired', 'message' => 'Subscription inactive or expired.']);
     }
 
-    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `recipients` WHERE LOWER(`owner_email`) = :email");
-    $cntStmt->execute([':email' => $verifiedEmail]);
-    $currentTotal = (int)$cntStmt->fetchColumn();
+    $currentTotal = getLiveRecipientCount($pdo, $verifiedEmail, $relaySecret);
 
     $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
     $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
     $maxBatch = (int)($lic['max_batch_limit'] ?? $planLimits['max_batch_limit']);
     $availSlots = max(0, $maxRec - $currentTotal);
 
+    $expTime = !empty($lic['expires_at']) ? strtotime($lic['expires_at'] . (strlen($lic['expires_at']) === 10 ? ' 23:59:59' : '')) : (time() + 86400 * 30);
+
     sendJson([
         'ok' => true,
         'status' => 'active',
+        'expireDate' => $lic['expires_at'],
+        'exp' => $expTime,
         'quota' => [
             'plan_name' => $lic['plan'] ?? 'Pro',
             'plan_status' => 'active',
@@ -707,7 +796,7 @@ function callDjangoMailFlowApi(string $path, array $data = [], string $method = 
 // ----------------------------------------------------
 // Handle Client Lead Push & Lists Actions
 // ----------------------------------------------------
-if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) {
+if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license', 'get_scraper_rules'])) {
     $clientEmail = strtolower(trim($input['email'] ?? ''));
     $clientDevice = trim($input['deviceId'] ?? $input['device_id'] ?? '');
 
@@ -731,6 +820,108 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) 
         sendJson(['ok' => false, 'status' => 'expired', 'error' => 'Active subscription required.'], 403);
     }
 
+    // Dynamic Server-Gated Extraction Rules
+    if ($action === 'get_scraper_rules') {
+        if (!empty($clientDevice)) {
+            $activeDevs = getActiveDevicesForLicense($pdo, (int)$lic['id']);
+            $devList = array_column($activeDevs, 'device_id');
+            if (!empty($devList) && !in_array($clientDevice, $devList) && count($activeDevs) >= MAX_DEVICE_LIMIT) {
+                sendJson([
+                    'ok' => false,
+                    'status' => 'device_locked',
+                    'error' => 'Device unauthorized. Please verify via OTP on Mail Flow.'
+                ], 403);
+            }
+        }
+
+        $rules = [
+            'version' => '1.0.0',
+            'timestamp' => time(),
+            'modules' => [
+                'maps' => [
+                    'feedSelectors' => [
+                        'div[role="feed"]',
+                        'div[aria-label^="Results for"]',
+                        '.m6QErb[aria-label]',
+                        '.m6QErb.DxyBCb'
+                    ],
+                    'cardSelectors' => [
+                        'div.Nv2PK',
+                        'div[role="article"]',
+                        'div.THOPZb',
+                        'div.m6QErb > div[jsaction]',
+                        'div:has(> a.hfpxzc)'
+                    ],
+                    'nameSelectors' => [
+                        '.qBF1Pd',
+                        '.fontHeadlineSmall',
+                        '[class*="fontHeadline"]',
+                        'a.hfpxzc',
+                        'h2'
+                    ],
+                    'ratingSelectors' => [
+                        '.MW4etd',
+                        'span[aria-label*="stars" i]',
+                        'span[aria-label*="star" i]',
+                        'span[role="img"][aria-label*="stars" i]'
+                    ],
+                    'reviewCountSelectors' => [
+                        '.UY7F9',
+                        '.RDApEe'
+                    ],
+                    'websiteSelectors' => [
+                        'a[data-item-id="authority"]',
+                        'a[aria-label*="website" i]',
+                        'a[aria-label*="Website" i]',
+                        'a[data-tooltip*="website" i]',
+                        'a[href^="http"]:not([href*="google."]):not([href*="gstatic."])'
+                    ],
+                    'phoneSelectors' => [
+                        'button[data-item-id*="phone"]',
+                        'button[data-tooltip*="phone" i]',
+                        'button[aria-label*="Phone" i]',
+                        'button[aria-label*="phone" i]',
+                        '[data-item-id*="phone"]'
+                    ],
+                    'addressSelectors' => [
+                        'button[data-item-id="address"]',
+                        'button[data-tooltip*="address" i]',
+                        'button[aria-label*="Address" i]',
+                        '[data-item-id*="address"]',
+                        'div.W4Efsd > span:last-child'
+                    ],
+                    'emailRegex' => '([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})',
+                    'scrollWaitMs' => 1200,
+                    'maxScrollAttempts' => 200
+                ],
+                'scraper' => [
+                    'directoryDomains' => ['yelp.', 'theknot.', 'bbb.org', 'yellowpages.', 'manta.', 'thumbtack.', 'clutch.co', 'angi.', 'bark.com', 'trustpilot.'],
+                    'badDomains' => ['google.', 'facebook.', 'instagram.', 'twitter.', 'x.com', 'pinterest.', 'linkedin.', 'youtube.', 'onetrust.com', 'privacypolicy', 'terms', 'cookie'],
+                    'emailRegex' => '([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})',
+                    'phoneRegex' => '(\\+?\\d{1,4}[\\s.-]?)?\\(?\\d{2,4}\\)?[\\s.-]?\\d{3,4}[\\s.-]?\\d{3,4}'
+                ],
+                'instagram' => [
+                    'profileBio' => 'header section > div:last-child',
+                    'followers' => 'header section ul li:nth-child(2)',
+                    'emailRegex' => '([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})'
+                ],
+                'facebook' => [
+                    'groupMemberCards' => 'div[role="listitem"], div[data-visualcompletion="ignore-dynamic-snippet"]',
+                    'pageAbout' => 'div[role="main"]',
+                    'emailRegex' => '([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})'
+                ]
+            ]
+        ];
+
+        sendJson([
+            'ok' => true,
+            'status' => 'success',
+            'rules' => $rules,
+            'plan' => $lic['plan'] ?? 'Pro',
+            'email' => $clientEmail
+        ]);
+    }
+
     if ($action === 'get_recipient_lists') {
         // 1. Try Forwarding directly to Django API
         $djangoRes = callDjangoMailFlowApi('/api/recipient-lists/summary/?email=' . urlencode($clientEmail), [], 'GET', $relaySecret);
@@ -738,22 +929,29 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) 
             sendJson($djangoRes);
         }
 
-        // 2. Try Querying Django tables in database
+        // 2. Try Querying Django tables in database (Scoped to Organization)
         try {
-            $stmt = $pdo->prepare("
-                SELECT l.id, l.list_name, l.description, COUNT(r.id) AS recipient_count, DATE_FORMAT(l.created_at, '%Y-%m-%d %H:%i') AS created_at
-                FROM `recipients_recipientlist` l
-                LEFT JOIN `recipients_recipient` r ON r.recipient_list_id = l.id
-                GROUP BY l.id
-                ORDER BY l.id DESC
-            ");
-            $stmt->execute();
-            $rows = $stmt->fetchAll();
-            if (!empty($rows)) {
-                sendJson([
-                    'ok' => true,
-                    'results' => $rows
-                ]);
+            $uStmt = $pdo->prepare("SELECT organization_id FROM `users_user` WHERE LOWER(`email`) = :email LIMIT 1");
+            $uStmt->execute([':email' => $clientEmail]);
+            $orgId = $uStmt->fetchColumn();
+
+            if ($orgId) {
+                $stmt = $pdo->prepare("
+                    SELECT l.id, l.list_name, l.description, COUNT(r.id) AS recipient_count, DATE_FORMAT(l.created_at, '%Y-%m-%d %H:%i') AS created_at
+                    FROM `recipients_recipientlist` l
+                    LEFT JOIN `recipients_recipient` r ON r.recipient_list_id = l.id
+                    WHERE l.organization_id = :orgId
+                    GROUP BY l.id
+                    ORDER BY l.id DESC
+                ");
+                $stmt->execute([':orgId' => $orgId]);
+                $rows = $stmt->fetchAll();
+                if (!empty($rows)) {
+                    sendJson([
+                        'ok' => true,
+                        'results' => $rows
+                    ]);
+                }
             }
         } catch (\Throwable $e) {}
 
@@ -804,8 +1002,11 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) 
             $orgId = $djangoUser['organization_id'] ?? null;
             $userId = $djangoUser['id'] ?? null;
             if (!$orgId) {
-                $orgStmt = $pdo->query("SELECT id FROM `common_organization` LIMIT 1");
-                $orgId = (int)$orgStmt->fetchColumn() ?: 1;
+                sendJson([
+                    'ok' => false,
+                    'status' => 'unauthorized_organization',
+                    'error' => 'Account is not associated with an active organization on Mail Flow.'
+                ], 403);
             }
 
             $listId = !empty($input['list_id']) ? (int)$input['list_id'] : null;
@@ -873,6 +1074,13 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) 
                     }
                 }
 
+                $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
+                $maxRecipients = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
+                $cntTotal = $pdo->prepare("SELECT COUNT(*) FROM `recipients_recipient` WHERE `organization_id` = :org");
+                $cntTotal->execute([':org' => $orgId]);
+                $updatedTotal = (int)$cntTotal->fetchColumn();
+                $availSlots = max(0, $maxRecipients - $updatedTotal);
+
                 sendJson([
                     'ok' => true,
                     'list_id' => $listId,
@@ -880,6 +1088,11 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license'])) 
                     'inserted' => $djangoInserted,
                     'duplicates' => $djangoDups,
                     'total_processed' => count($leads),
+                    'quota' => [
+                        'max_recipients' => $maxRecipients,
+                        'current_recipients' => $updatedTotal,
+                        'available_slots' => $availSlots,
+                    ]
                 ]);
             }
         } catch (\Throwable $e) {

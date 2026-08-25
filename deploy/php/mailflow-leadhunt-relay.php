@@ -504,8 +504,8 @@ if ($action === 'activate_license') {
         if (!$isDjangoUser) {
             sendJson([
                 'ok' => false,
-                'status' => 'not_found',
-                'error' => 'Account not found. ' . $email . ' is not registered in any Mail Flow organization. Please sign up at mail-flow.annomous.com first.'
+                'status' => 'unauthorized',
+                'error' => 'Access denied. ' . $email . ' requires an active paid subscription or administrator approval. Please upgrade your plan at mail-flow.annomous.com.'
             ], 403);
         }
 

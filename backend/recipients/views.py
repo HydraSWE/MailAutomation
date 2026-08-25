@@ -19,16 +19,40 @@ logger = logging.getLogger(__name__)
 
 def authenticate_lead_hunter_request(request):
     """
-    Returns (user, organization) if authenticated via user session/JWT, valid relay secret, or email lookup.
-    Strictly returns (None, None) if the email does not belong to any active user.
+    Returns (user, organization) if authenticated and authorized for Lead Hunter.
+    Rules:
+      1. If email is not a registered, active User -> STRICT REJECT (None, None).
+      2. Authorized if:
+         a) User is superuser / staff / organization owner or admin, OR
+         b) Organization has an active paid subscription (status == 'active', not is_free, and not expired).
+         Otherwise, strictly returns (None, None).
     """
     from users.models import User
     from common.models import Organization
+    from django.utils import timezone
 
     def get_or_default_org(u):
         if not u:
             return None
         return getattr(u, "organization", None)
+
+    def is_lead_hunter_authorized(u, org):
+        if not u or not u.is_active:
+            return False
+        # Super admin, staff, or org owner/admin always authorized
+        if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False) or getattr(u, "role", "") in ("owner", "admin"):
+            return True
+        if not org:
+            return False
+        # Check active paid subscription
+        sub = getattr(org, "subscription", None)
+        if sub and getattr(sub, "status", "") == "active":
+            end_date = getattr(sub, "current_period_end", None)
+            if not end_date or end_date >= timezone.now():
+                plan = getattr(sub, "plan", None)
+                if plan and not getattr(plan, "is_free", False):
+                    return True
+        return False
 
     secret = getattr(settings, "MAIL_FLOW_LEADHUNT_RELAY_SECRET", getattr(settings, "MAIL_FLOW_OTP_RELAY_SECRET", "10hyNlU7V0vvt67/T+7HFAtl90y1Q5AYMN4S8QkmpI8="))
     provided_secret = request.headers.get("X-Mail-Flow-Secret") or request.META.get("HTTP_X_MAIL_FLOW_SECRET", "")
@@ -39,7 +63,9 @@ def authenticate_lead_hunter_request(request):
         if email:
             user = User.objects.filter(email__iexact=email, is_active=True).first() or User.objects.filter(username__iexact=email, is_active=True).first()
             if user:
-                return user, get_or_default_org(user)
+                org = get_or_default_org(user)
+                if is_lead_hunter_authorized(user, org):
+                    return user, org
         return None, None
 
     if request.user and request.user.is_authenticated:
@@ -49,7 +75,9 @@ def authenticate_lead_hunter_request(request):
             org = None
         if not org:
             org = get_or_default_org(request.user)
-        return request.user, org
+        if is_lead_hunter_authorized(request.user, org):
+            return request.user, org
+        return None, None
 
     return None, None
 

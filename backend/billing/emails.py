@@ -782,39 +782,78 @@ def deliver_custom_workspace_ready_email(quote: Any) -> None:
 def deliver_lead_hunter_plus_welcome_email(user_email: str, plan_name: str = "Pro") -> None:
     """
     Sends the official Lead Hunter companion onboarding email using Mail Flow's standard brand shell.
+    Includes direct ZIP download link and step-by-step Chrome installation guide.
     """
-    subject = "Welcome to Mail Flow — Your Lead Hunter Pro Access is Ready! 🚀"
-    intro = f"As part of your active Mail Flow subscription, complimentary access to the Lead Hunter Pro Chrome extension has been provisioned for {user_email}."
+    download_url = "https://mail.annomous.com/lead-hunter/lead-hunter.zip"
+    subject = "Welcome to Mail Flow - Your Lead Hunter Pro Access is Ready! 🚀"
+    intro = (
+        f"Your access to Mail Flow - Lead Hunter ({plan_name} Edition) has been activated for {user_email}. "
+        "Follow the quick 30-second setup below to install the extension and start extracting verified B2B leads."
+    )
     
     rows = [
         ("Account Email", user_email),
         ("Lead Hunter Tier", f"{plan_name} Edition"),
-        ("Features Included", "5 B2B Scrapers + Deep Verification"),
-        ("Single-Device Security", "Hardware Locked"),
+        ("Lead Engines", "Maps, IG, FB, Fiverr, VIP Hub"),
+        ("Direct Export", "1-Click Push to Mail Flow"),
         ("Status", "Active"),
     ]
     
     custom_content = (
-        "<div style=\"background-color:#0B0F17;border:1px solid #1E293B;border-radius:10px;padding:20px;margin:20px 0;\">"
-        "<div style=\"font-size:12px;font-weight:700;color:#38BDF8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;\">Quick Setup in 2 Steps</div>"
-        "<ol style=\"margin:0;padding-left:18px;color:#94A3B8;font-size:13px;line-height:1.7;\">"
-        "<li style=\"margin-bottom:6px;\">Install the <strong>Mail Flow - Lead Hunter</strong> Chrome extension.</li>"
-        f"<li>Open the extension, enter your registered email (<strong style=\"color:#F8FAFC;\">{escape(user_email)}</strong>), and click <strong style=\"color:#38BDF8;\">Activate</strong>.</li>"
-        "</ol>"
-        "</div>"
+        f"<div style=\"background-color:#0B0F17;border:1px solid #1E293B;border-radius:10px;padding:20px;margin:20px 0;\">"
+        f"<div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;\">"
+        f"<div style=\"font-size:12px;font-weight:700;color:#38BDF8;text-transform:uppercase;letter-spacing:0.08em;\">📥 Step 1: Download & Install (30 Seconds)</div>"
+        f"<span style=\"font-size:10.5px;color:#FCD34D;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);padding:2px 8px;border-radius:10px;font-weight:600;\">Web Store: Coming Soon</span>"
+        f"</div>"
+        f"<ol style=\"margin:0;padding-left:18px;color:#CBD5E1;font-size:13px;line-height:1.75;\">"
+        f"<li style=\"margin-bottom:8px;\"><strong>Download ZIP:</strong> Download the extension package from <a href=\"{download_url}\" target=\"_blank\" style=\"color:#38BDF8;font-weight:600;text-decoration:underline;\">{download_url}</a></li>"
+        f"<li style=\"margin-bottom:8px;\"><strong>Extract:</strong> Unzip <code>lead-hunter.zip</code> into a folder on your computer.</li>"
+        f"<li style=\"margin-bottom:8px;\"><strong>Open Chrome Extensions:</strong> In Google Chrome, go to <code style=\"background:#1E293B;padding:2px 6px;border-radius:4px;color:#A5B4FC;\">chrome://extensions</code></li>"
+        f"<li style=\"margin-bottom:8px;\"><strong>Enable Developer Mode:</strong> In the top-right corner, toggle <strong>ON</strong> <code>Developer mode</code>.</li>"
+        f"<li style=\"margin-bottom:8px;\"><strong>Load Extension:</strong> Click <strong style=\"color:#34D399;\">Load unpacked</strong> (top-left) and select your unzipped folder.</li>"
+        f"<li><strong>Pin to Toolbar:</strong> Click the Extensions puzzle icon in Chrome and pin <strong>Mail Flow - Lead Hunter</strong>.</li>"
+        f"</ol>"
+        f"</div>"
+        f"<div style=\"background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:14px 16px;margin-bottom:20px;\">"
+        f"<div style=\"font-size:12px;font-weight:700;color:#34D399;margin-bottom:4px;\">🔑 Step 2: Instant Activation</div>"
+        f"<div style=\"font-size:12.5px;color:#E2E8F0;line-height:1.5;\">"
+        f"Open the extension popup, enter your registered email (<strong style=\"color:#F8FAFC;\">{escape(user_email)}</strong>), and click <strong style=\"color:#38BDF8;\">Activate Lead Hunter</strong>."
+        f"</div>"
+        f"</div>"
+        f"<div style=\"font-size:11.5px;color:#94A3B8;line-height:1.5;\">"
+        f"⚡ <strong>Included Extraction Modules:</strong> Google Maps B2B, Instagram Hunter, Facebook Client Hunter, Fiverr Prospector, and VIP Directory Hub with 1-Click direct push into your Mail Flow campaign recipient lists."
+        f"</div>"
     )
     
-    cta_url = getattr(settings, "LEAD_HUNTER_CHROME_STORE_URL", "https://chromewebstore.google.com")
-    cta_label = "Get Lead Hunter for Chrome"
+    cta_url = download_url
+    cta_label = "📥 Download Lead Hunter (ZIP)"
     
     body = (
         f"Hello,\n\n"
-        f"Your complimentary access to Mail Flow - Lead Hunter Pro has been provisioned for {user_email}!\n\n"
-        f"To get started:\n"
-        f"1. Install the extension from Chrome Web Store: {cta_url}\n"
-        f"2. Open the popup, enter your email ({user_email}), and click Activate.\n\n"
+        f"Your access to Mail Flow - Lead Hunter ({plan_name} Edition) has been activated for {user_email}!\n\n"
+        f"--------------------------------------------------\n"
+        f"📥 DOWNLOAD EXTENSION\n"
+        f"--------------------------------------------------\n"
+        f"Direct ZIP Download: {download_url}\n"
+        f"(Chrome Web Store 1-click install: Coming Soon)\n\n"
+        f"--------------------------------------------------\n"
+        f"🛠️ HOW TO INSTALL IN GOOGLE CHROME (30 Seconds)\n"
+        f"--------------------------------------------------\n"
+        f"1. Download the ZIP from: {download_url}\n"
+        f"2. Extract / unzip the folder on your computer.\n"
+        f"3. In Google Chrome, go to: chrome://extensions\n"
+        f"4. In the top-right corner, turn ON 'Developer mode'.\n"
+        f"5. Click 'Load unpacked' (top-left) and select the unzipped folder.\n"
+        f"6. Pin 'Mail Flow - Lead Hunter' to your Chrome toolbar.\n\n"
+        f"--------------------------------------------------\n"
+        f"🔑 ACTIVATION\n"
+        f"--------------------------------------------------\n"
+        f"1. Open the Lead Hunter extension.\n"
+        f"2. Enter your account email: {user_email}\n"
+        f"3. Click 'Activate Lead Hunter' and start prospecting!\n\n"
         f"Best regards,\n"
-        f"The Mail Flow Team"
+        f"The Mail Flow Team\n"
+        f"https://mail-flow.annomous.com"
     )
     
     html = build_html_shell(

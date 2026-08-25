@@ -105,7 +105,26 @@ class RecipientListViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             }
             for rl in lists
         ]
-        return Response({"ok": True, "results": results})
+
+        # Quota metadata for Lead Hunter
+        sub = getattr(organization, "subscription", None)
+        plan = getattr(sub, "plan", None) if sub else None
+        max_recipients = getattr(plan, "max_recipients", 10000) if plan else 10000
+        current_total_recipients = Recipient.objects.filter(organization=organization).count()
+        available_slots = max(0, max_recipients - current_total_recipients)
+
+        return Response({
+            "ok": True,
+            "results": results,
+            "quota": {
+                "plan_name": getattr(plan, "name", "Pro") if plan else "Pro",
+                "plan_status": getattr(sub, "status", "active") if sub else "active",
+                "max_recipients": max_recipients,
+                "current_recipients": current_total_recipients,
+                "available_slots": available_slots,
+                "max_batch_limit": min(500, max(50, available_slots)),
+            }
+        })
 
 
 class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
@@ -185,6 +204,24 @@ class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         user, organization = authenticate_lead_hunter_request(request)
         if not user or not organization:
             return Response({"detail": "Authentication credentials were not provided or invalid."}, status=401)
+
+        # Quota verification
+        sub = getattr(organization, "subscription", None)
+        plan = getattr(sub, "plan", None) if sub else None
+        max_recipients = getattr(plan, "max_recipients", 10000) if plan else 10000
+        current_total_recipients = Recipient.objects.filter(organization=organization).count()
+        available_slots = max(0, max_recipients - current_total_recipients)
+
+        if available_slots <= 0:
+            plan_title = getattr(plan, "name", "Current") if plan else "Current"
+            return Response({
+                "ok": False,
+                "error": f"Recipient limit reached ({current_total_recipients}/{max_recipients}). Upgrade your {plan_title} plan to import more leads.",
+                "quota_exceeded": True,
+                "max_recipients": max_recipients,
+                "current_recipients": current_total_recipients,
+                "available_slots": 0,
+            }, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
         list_id = data.get("list_id") or data.get("recipient_list")
@@ -295,8 +332,17 @@ class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                     )
                 )
 
+        quota_warning = None
+        if len(new_recipients) > available_slots:
+            skipped_due_to_quota = len(new_recipients) - available_slots
+            new_recipients = new_recipients[:available_slots]
+            quota_warning = f"Imported {available_slots} leads. {skipped_due_to_quota} leads were skipped because your plan's recipient quota was reached."
+
         if new_recipients:
             Recipient.objects.bulk_create(new_recipients, batch_size=500)
+
+        updated_total_recipients = Recipient.objects.filter(organization=organization).count()
+        new_available_slots = max(0, max_recipients - updated_total_recipients)
 
         return Response({
             "ok": True,
@@ -306,5 +352,12 @@ class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             "duplicates": duplicates_count,
             "total_processed": len(leads),
             "total_recipients_in_list": recipient_list.recipients.count(),
+            "quota_warning": quota_warning,
+            "quota": {
+                "max_recipients": max_recipients,
+                "current_recipients": updated_total_recipients,
+                "available_slots": new_available_slots,
+            }
         }, status=status.HTTP_200_OK)
+
 

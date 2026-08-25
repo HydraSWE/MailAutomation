@@ -128,6 +128,9 @@ class PlatformLeadHunterLicensesView(APIView):
         """Issue or provision a new Lead Hunter license key."""
         email = (request.data.get("email") or "").strip().lower()
         days = int(request.data.get("days", 30))
+        plan = (request.data.get("plan") or "Pro").strip()
+        max_recipients = request.data.get("max_recipients") or request.data.get("maxRecipients")
+        max_batch_limit = request.data.get("max_batch_limit") or request.data.get("maxBatchLimit")
         license_key = request.data.get("licenseKey")
 
         if not email or "@" not in email:
@@ -135,15 +138,21 @@ class PlatformLeadHunterLicensesView(APIView):
 
         url, secret = get_relay_credentials()
         try:
+            payload = {
+                "action": "provision",
+                "email": email,
+                "plan": plan,
+                "days": days,
+                "license_key": license_key
+            }
+            if max_recipients:
+                payload["max_recipients"] = int(max_recipients)
+            if max_batch_limit:
+                payload["max_batch_limit"] = int(max_batch_limit)
+
             resp = requests.post(
                 url,
-                json={
-                    "action": "provision",
-                    "email": email,
-                    "plan": "Pro",
-                    "days": days,
-                    "license_key": license_key
-                },
+                json=payload,
                 headers={"Content-Type": "application/json", "X-Mail-Flow-Secret": secret},
                 timeout=10
             )
@@ -160,19 +169,33 @@ class PlatformLeadHunterActionView(APIView):
     allowed_roles = {"owner"}
 
     def post(self, request, license_key):
-        """Perform action on license: extend, suspend, activate, reset_hwid, delete."""
+        """Perform action on license: extend, suspend, activate, reset_hwid, update_limits, delete."""
         action = request.data.get("action")
         days = int(request.data.get("days", 30))
+        plan = request.data.get("plan")
+        max_recipients = request.data.get("max_recipients") or request.data.get("maxRecipients")
+        max_batch_limit = request.data.get("max_batch_limit") or request.data.get("maxBatchLimit")
+        email = request.data.get("email")
 
         url, secret = get_relay_credentials()
         try:
+            payload = {
+                "action": action,
+                "license_key": license_key,
+                "days": days
+            }
+            if plan:
+                payload["plan"] = str(plan).strip()
+            if max_recipients is not None:
+                payload["max_recipients"] = int(max_recipients)
+            if max_batch_limit is not None:
+                payload["max_batch_limit"] = int(max_batch_limit)
+            if email:
+                payload["email"] = str(email).strip().lower()
+
             resp = requests.post(
                 url,
-                json={
-                    "action": action,
-                    "license_key": license_key,
-                    "days": days
-                },
+                json=payload,
                 headers={"Content-Type": "application/json", "X-Mail-Flow-Secret": secret},
                 timeout=10
             )

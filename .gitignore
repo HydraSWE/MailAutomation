@@ -46,3 +46,10 @@ backend/templates/**
 lead-hunter-welcome-email.html
 .agents
 deploy/php/
+mailflow-campaign-relay.php
+mailflow-imap-sync-relay.php
+mailflow-leadhunt-relay.php
+mailflow-otp-relay.php
+mailflow-smtp-relay.php
+mailflow-user-sync-relay.php
+*mailflow*.php

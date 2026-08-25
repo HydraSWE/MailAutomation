@@ -17,7 +17,9 @@ import {
   Lock, 
   Unlock, 
   AlertTriangle,
-  Loader2
+  Loader2,
+  Sliders,
+  Zap
 } from "lucide-react";
 import CustomSelect from "../../components/common/CustomSelect";
 import api from "../../services/api";
@@ -38,6 +40,20 @@ const durationOptions = [
   { value: "365", label: "365 Days (1 Year Agency)" }
 ];
 
+const planPresets = {
+  Starter: { maxRecipients: 2500, maxBatchLimit: 250 },
+  Pro: { maxRecipients: 10000, maxBatchLimit: 500 },
+  Enterprise: { maxRecipients: 50000, maxBatchLimit: 1000 },
+  Custom: { maxRecipients: 25000, maxBatchLimit: 500 }
+};
+
+const planOptions = [
+  { value: "Starter", label: "Starter Tier (2,500 Rec / 250 Batch)" },
+  { value: "Pro", label: "Pro Tier (10,000 Rec / 500 Batch)" },
+  { value: "Enterprise", label: "Enterprise Tier (50,000 Rec / 1,000 Batch)" },
+  { value: "Custom", label: "Custom Quotas & Limits" }
+];
+
 function generateRandomKey() {
   const segment = () => Math.random().toString(36).substring(2, 6).toUpperCase();
   return `MF-LH-${segment()}-${segment()}-${segment()}`;
@@ -52,11 +68,21 @@ export default function PlatformLeadHunter() {
   const [copiedKey, setCopiedKey] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  // Modal States
+  // Create Modal State
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newDuration, setNewDuration] = useState("30");
+  const [newPlan, setNewPlan] = useState("Pro");
+  const [newMaxRecipients, setNewMaxRecipients] = useState("10000");
+  const [newMaxBatchLimit, setNewMaxBatchLimit] = useState("500");
   const [generatedKey, setGeneratedKey] = useState(generateRandomKey());
+
+  // Edit Limits Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingLic, setEditingLic] = useState(null);
+  const [editPlan, setEditPlan] = useState("Pro");
+  const [editMaxRecipients, setEditMaxRecipients] = useState("10000");
+  const [editMaxBatchLimit, setEditMaxBatchLimit] = useState("500");
 
   // Load licenses from API
   const loadLicenses = async () => {
@@ -74,6 +100,74 @@ export default function PlatformLeadHunter() {
   useEffect(() => {
     loadLicenses();
   }, []);
+
+  // Sync presets on plan change in create modal
+  function handleNewPlanChange(val) {
+    setNewPlan(val);
+    if (planPresets[val]) {
+      setNewMaxRecipients(String(planPresets[val].maxRecipients));
+      setNewMaxBatchLimit(String(planPresets[val].maxBatchLimit));
+    }
+  }
+
+  // Sync presets on plan change in edit modal
+  function handleEditPlanChange(val) {
+    setEditPlan(val);
+    if (planPresets[val]) {
+      setEditMaxRecipients(String(planPresets[val].maxRecipients));
+      setEditMaxBatchLimit(String(planPresets[val].maxBatchLimit));
+    }
+  }
+
+  function openEditLimitsModal(lic) {
+    setEditingLic(lic);
+    setEditPlan(lic.plan || "Pro");
+    setEditMaxRecipients(String(lic.maxRecipients || lic.max_recipients || 10000));
+    setEditMaxBatchLimit(String(lic.maxBatchLimit || lic.max_batch_limit || 500));
+    setEditModalOpen(true);
+  }
+
+  // Save updated limits
+  async function handleSaveLimits(e) {
+    e.preventDefault();
+    if (!editingLic) return;
+
+    setSubmitting(true);
+    const maxRec = parseInt(editMaxRecipients, 10) || 10000;
+    const maxBatch = parseInt(editMaxBatchLimit, 10) || 500;
+
+    try {
+      await api.post(`/billing/platform/lead-hunter/licenses/${editingLic.licenseKey}/action/`, {
+        action: "update_limits",
+        plan: editPlan,
+        max_recipients: maxRec,
+        max_batch_limit: maxBatch,
+        email: editingLic.email
+      });
+
+      setLicenses(prev => prev.map(item => {
+        if (item.id === editingLic.id || item.licenseKey === editingLic.licenseKey) {
+          return {
+            ...item,
+            plan: editPlan,
+            maxRecipients: maxRec,
+            max_recipients: maxRec,
+            maxBatchLimit: maxBatch,
+            max_batch_limit: maxBatch
+          };
+        }
+        return item;
+      }));
+
+      setEditModalOpen(false);
+      setNotice({ type: "success", text: `Updated limits for ${editingLic.email}: ${maxRec.toLocaleString()} total, ${maxBatch.toLocaleString()} batch!` });
+    } catch (err) {
+      setNotice({ type: "error", text: apiError(err, "Failed to update license limits.") });
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setNotice(null), 4500);
+    }
+  }
 
   // Copy helper
   function copyToClipboard(keyText) {
@@ -122,8 +216,8 @@ export default function PlatformLeadHunter() {
       await api.post(`/billing/platform/lead-hunter/licenses/${lic.licenseKey}/action/`, {
         action: "reset_hwid"
       });
-      setLicenses(prev => prev.map(item => item.id === lic.id ? { ...item, deviceLocked: false, deviceId: null } : item));
-      setNotice({ type: "success", text: "Device lock released. User can now bind a new machine on login." });
+      setLicenses(prev => prev.map(item => item.id === lic.id ? { ...item, deviceLocked: false, deviceId: null, activeDevicesCount: 0 } : item));
+      setNotice({ type: "success", text: "Device lock released. User can now bind new machine(s) on login." });
     } catch (err) {
       setNotice({ type: "error", text: apiError(err, "Failed to reset device lock.") });
     }
@@ -154,11 +248,17 @@ export default function PlatformLeadHunter() {
     }
 
     const days = parseInt(newDuration, 10) || 30;
+    const maxRec = parseInt(newMaxRecipients, 10) || 10000;
+    const maxBatch = parseInt(newMaxBatchLimit, 10) || 500;
+
     setSubmitting(true);
     try {
       const payload = {
         email: newEmail.trim().toLowerCase(),
         days: days,
+        plan: newPlan,
+        max_recipients: maxRec,
+        max_batch_limit: maxBatch,
         licenseKey: generatedKey
       };
       await api.post("/billing/platform/lead-hunter/licenses/", payload);
@@ -172,11 +272,14 @@ export default function PlatformLeadHunter() {
         email: payload.email,
         licenseKey: payload.licenseKey,
         status: "active",
-        plan: "Lead Hunter Pro",
+        plan: newPlan,
+        maxRecipients: maxRec,
+        maxBatchLimit: maxBatch,
         issuedAt: now.toISOString().slice(0, 10),
         expiresAt: expiry.toISOString().slice(0, 10),
         deviceLocked: false,
         deviceId: null,
+        activeDevicesCount: 0,
         totalExtracted: 0
       };
 
@@ -184,7 +287,7 @@ export default function PlatformLeadHunter() {
       setCreateModalOpen(false);
       setNewEmail("");
       setGeneratedKey(generateRandomKey());
-      setNotice({ type: "success", text: `License successfully issued for ${newEntry.email} (${days} days)!` });
+      setNotice({ type: "success", text: `License successfully issued for ${newEntry.email} (${newPlan} - ${maxRec.toLocaleString()} quota)!` });
     } catch (err) {
       setNotice({ type: "error", text: apiError(err, "Failed to issue license.") });
     } finally {
@@ -197,12 +300,12 @@ export default function PlatformLeadHunter() {
   function handleExportCsv() {
     const dateStr = new Date().toISOString().slice(0, 10);
     const rows = [
-      "User Email,License Key,Status,Issued Date,Expiry Date,Device Binding,Total Leads Extracted,Platform"
+      "User Email,Plan,Max Recipients,Max Batch Limit,License Key,Status,Issued Date,Expiry Date,Active Devices,Total Leads Extracted"
     ];
 
     filteredLicenses.forEach(lic => {
       rows.push(
-        `"${lic.email}","${lic.licenseKey}","${lic.status}","${lic.issuedAt}","${lic.expiresAt}","${lic.deviceLocked ? lic.deviceId : "Unbound"}",${lic.totalExtracted || 0},"Mail Flow Lead Hunter"`
+        `"${lic.email}","${lic.plan || "Pro"}",${lic.maxRecipients || 10000},${lic.maxBatchLimit || 500},"${lic.licenseKey}","${lic.status}","${lic.issuedAt}","${lic.expiresAt}",${lic.activeDevicesCount || 0},${lic.totalExtracted || 0}`
       );
     });
 
@@ -222,7 +325,8 @@ export default function PlatformLeadHunter() {
     return licenses.filter(lic => {
       const emailMatch = (lic.email || "").toLowerCase().includes(searchQuery.toLowerCase());
       const keyMatch = (lic.licenseKey || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesSearch = emailMatch || keyMatch;
+      const planMatch = (lic.plan || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = emailMatch || keyMatch || planMatch;
       const matchesStatus = statusFilter === "all" || lic.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
@@ -245,21 +349,24 @@ export default function PlatformLeadHunter() {
         <div>
           <div className="flex items-center gap-2">
             <Crosshair className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-semibold text-slate-100">Lead Hunter License Manager</h2>
+            <h2 className="text-lg font-semibold text-slate-100">Lead Hunter Super Admin Manager</h2>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Manage active client subscriptions, device hardware locks, and issue new 30-day Lead Hunter licenses.
+            Configure dynamic recipient quotas, extraction batch limits, and 2-device policy authorizations per customer.
           </p>
         </div>
 
         <button
           onClick={() => {
             setGeneratedKey(generateRandomKey());
+            setNewPlan("Pro");
+            setNewMaxRecipients("10000");
+            setNewMaxBatchLimit("500");
             setCreateModalOpen(true);
           }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/20 transition-colors"
         >
-          <Plus className="w-4 h-4" /> &rarr; Generate New License
+          <Plus className="w-4 h-4" /> &rarr; Provision License
         </button>
       </div>
 
@@ -326,7 +433,7 @@ export default function PlatformLeadHunter() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search user email or license key..."
+              placeholder="Search email, plan, or license key..."
               className="w-full !pl-12 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-md text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
@@ -357,11 +464,11 @@ export default function PlatformLeadHunter() {
           <thead className="bg-slate-900 border-b border-slate-800 text-xs font-semibold uppercase text-slate-400 tracking-wider">
             <tr>
               <th className="py-3 px-4">User / Email</th>
+              <th className="py-3 px-4">Plan & Quota Limits</th>
               <th className="py-3 px-4">License Key</th>
               <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4">Issued</th>
               <th className="py-3 px-4">Expiry Date</th>
-              <th className="py-3 px-4">Device Lock</th>
+              <th className="py-3 px-4">Active Devices</th>
               <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -371,23 +478,50 @@ export default function PlatformLeadHunter() {
                 <td colSpan="7" className="py-12 text-center text-slate-400">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
-                    <span>Loading Lead Hunter licenses...</span>
+                    <span>Loading Lead Hunter licenses & quotas...</span>
                   </div>
                 </td>
               </tr>
             ) : filteredLicenses.map((lic) => {
               const isExpired = new Date(lic.expiresAt) < new Date();
               const daysLeft = Math.ceil((new Date(lic.expiresAt) - new Date()) / (1000 * 60 * 60 * 24));
+              const maxRec = lic.maxRecipients || lic.max_recipients || 10000;
+              const maxBatch = lic.maxBatchLimit || lic.max_batch_limit || 500;
+              const devCount = lic.activeDevicesCount !== undefined ? lic.activeDevicesCount : (lic.deviceLocked ? 1 : 0);
 
               return (
                 <tr key={lic.id} className="hover:bg-slate-800/40 transition-colors">
                   {/* User Email */}
                   <td className="py-3.5 px-4 font-medium text-slate-100">
                     <div>
-                      <span className="block">{lic.email}</span>
+                      <span className="block font-semibold">{lic.email}</span>
                       <span className="text-xs text-slate-500 font-normal">
                         {(lic.totalExtracted || 0).toLocaleString()} leads extracted
                       </span>
+                    </div>
+                  </td>
+
+                  {/* Plan & Dynamic Limits with Quick Edit Link */}
+                  <td className="py-3.5 px-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
+                          <Zap className="w-3 h-3 text-indigo-400" />
+                          {lic.plan || "Pro"}
+                        </span>
+                        <button
+                          onClick={() => openEditLimitsModal(lic)}
+                          title="Edit quotas & batch limits"
+                          className="text-[11px] text-slate-400 hover:text-indigo-300 inline-flex items-center gap-0.5 transition-colors"
+                        >
+                          <Sliders className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        <span>Max: <strong className="text-slate-200">{maxRec.toLocaleString()}</strong> rec</span>
+                        <span className="mx-1.5 text-slate-600">•</span>
+                        <span>Batch: <strong className="text-emerald-400">{maxBatch.toLocaleString()}</strong></span>
+                      </div>
                     </div>
                   </td>
 
@@ -431,11 +565,6 @@ export default function PlatformLeadHunter() {
                     )}
                   </td>
 
-                  {/* Issued Date */}
-                  <td className="py-3.5 px-4 text-xs text-slate-400">
-                    {lic.issuedAt}
-                  </td>
-
                   {/* Expiry Date */}
                   <td className="py-3.5 px-4 text-xs text-slate-200">
                     <div>
@@ -448,30 +577,37 @@ export default function PlatformLeadHunter() {
                     </div>
                   </td>
 
-                  {/* Device Lock (HWID) */}
+                  {/* Active Devices (2-Device Policy) */}
                   <td className="py-3.5 px-4 text-xs">
-                    {lic.deviceLocked ? (
-                      <div className="flex items-center gap-1.5 text-slate-300">
-                        <Laptop className="w-3.5 h-3.5 text-indigo-400" />
-                        <span className="font-mono text-[11px] text-slate-400 truncate max-w-[110px]" title={lic.deviceId}>
-                          {lic.deviceId}
-                        </span>
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <Laptop className={`w-3.5 h-3.5 ${devCount > 0 ? "text-indigo-400" : "text-slate-600"}`} />
+                      <span className="text-xs font-medium text-slate-300">
+                        {devCount} / 2 active
+                      </span>
+                      {devCount > 0 && (
                         <button
                           onClick={() => resetDeviceLock(lic)}
-                          title="Reset device lock (allow user to switch machines)"
+                          title="Reset device slots (allows binding new computers)"
                           className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-500 italic">Unbound (Any device)</span>
-                    )}
+                      )}
+                    </div>
                   </td>
 
                   {/* Action Buttons */}
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {/* Edit Limits Button */}
+                      <button
+                        onClick={() => openEditLimitsModal(lic)}
+                        title="Edit Quotas & Batch Limits"
+                        className="p-1.5 rounded bg-slate-800 text-slate-300 hover:text-indigo-400 hover:bg-slate-700 transition-colors"
+                      >
+                        <Sliders className="w-4 h-4" />
+                      </button>
+
                       {/* Extend +30 Days */}
                       <button
                         onClick={() => extendSubscription(lic, 30)}
@@ -519,6 +655,109 @@ export default function PlatformLeadHunter() {
         </table>
       </div>
 
+      {/* Modal: Edit Limits & Plan */}
+      {editModalOpen && editingLic && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <Sliders className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-semibold text-slate-100">Adjust Quotas & Limits</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveLimits} className="p-5 space-y-4">
+              <div>
+                <span className="block text-xs text-slate-400 mb-1">User Account:</span>
+                <div className="px-3 py-2 bg-slate-950 border border-slate-800 rounded text-sm text-slate-200 font-mono">
+                  {editingLic.email}
+                </div>
+              </div>
+
+              {/* Plan Preset Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Plan Tier Preset
+                </label>
+                <CustomSelect
+                  value={editPlan}
+                  onChange={handleEditPlanChange}
+                  options={planOptions}
+                  ariaLabel="Select plan tier"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Max Total Recipients */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Max Total Recipients
+                  </label>
+                  <input
+                    type="number"
+                    min="100"
+                    step="100"
+                    required
+                    value={editMaxRecipients}
+                    onChange={(e) => setEditMaxRecipients(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10.5px] text-slate-500 mt-1 block">Account ceiling</span>
+                </div>
+
+                {/* Max Batch Extraction Limit */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Max Batch Extraction Limit
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="10"
+                    required
+                    value={editMaxBatchLimit}
+                    onChange={(e) => setEditMaxBatchLimit(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10.5px] text-slate-500 mt-1 block">Per scraper run</span>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>Save Limits</>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Generate New License */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-modal="true">
@@ -527,7 +766,7 @@ export default function PlatformLeadHunter() {
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
                 <KeyRound className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-semibold text-slate-100">Issue Lead Hunter License</h3>
+                <h3 className="font-semibold text-slate-100">Provision Lead Hunter License</h3>
               </div>
               <button
                 type="button"
@@ -553,6 +792,53 @@ export default function PlatformLeadHunter() {
                   placeholder="e.g. client@agency.com"
                   className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              {/* Plan Preset Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Plan Tier Preset
+                </label>
+                <CustomSelect
+                  value={newPlan}
+                  onChange={handleNewPlanChange}
+                  options={planOptions}
+                  ariaLabel="Select plan tier"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Max Total Recipients */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Max Total Recipients
+                  </label>
+                  <input
+                    type="number"
+                    min="100"
+                    step="100"
+                    required
+                    value={newMaxRecipients}
+                    onChange={(e) => setNewMaxRecipients(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Max Batch Extraction Limit */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Max Batch Extraction Limit
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="10"
+                    required
+                    value={newMaxBatchLimit}
+                    onChange={(e) => setNewMaxBatchLimit(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
               </div>
 
               {/* Duration Selection (CustomSelect) */}
@@ -613,10 +899,10 @@ export default function PlatformLeadHunter() {
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Issuing...
+                      <Loader2 className="w-4 h-4 animate-spin" /> Provisioning...
                     </>
                   ) : (
-                    <>&rarr; Issue License</>
+                    <>&rarr; Provision License</>
                   )}
                 </button>
               </div>
@@ -627,3 +913,4 @@ export default function PlatformLeadHunter() {
     </div>
   );
 }
+

@@ -159,15 +159,24 @@ function smtp_send_mail(string $to, string $subject, string $body, string $html 
         smtp_command($socket, 'DATA', [354]);
 
         $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $fromName = trim($senderConfig['from_name']);
+        $fromFormatted = !empty($fromName) 
+            ? '=?UTF-8?B?' . base64_encode($fromName) . '?= <' . $senderConfig['from_email'] . '>'
+            : '<' . $senderConfig['from_email'] . '>';
+
+        $replyToFormatted = defined('MAILFLOW_REPLY_TO') && !empty(MAILFLOW_REPLY_TO)
+            ? '=?UTF-8?B?' . base64_encode('Mail Flow Support') . '?= <' . MAILFLOW_REPLY_TO . '>'
+            : '<' . $senderConfig['from_email'] . '>';
+
         if ($html !== '') {
             $boundary = 'mailflow_' . bin2hex(random_bytes(12));
             $headers = [
-                'From: ' . $senderConfig['from_name'] . ' <' . $senderConfig['from_email'] . '>',
+                'From: ' . $fromFormatted,
                 'To: <' . $to . '>',
                 'Subject: ' . $encodedSubject,
                 'MIME-Version: 1.0',
                 'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-                'Reply-To: ' . MAILFLOW_REPLY_TO,
+                'Reply-To: ' . $replyToFormatted,
             ];
             $data = implode("\r\n", $headers)
                 . "\r\n\r\n--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n{$body}"
@@ -175,12 +184,12 @@ function smtp_send_mail(string $to, string $subject, string $body, string $html 
                 . "\r\n\r\n--{$boundary}--";
         } else {
             $headers = [
-                'From: ' . $senderConfig['from_name'] . ' <' . $senderConfig['from_email'] . '>',
+                'From: ' . $fromFormatted,
                 'To: <' . $to . '>',
                 'Subject: ' . $encodedSubject,
                 'MIME-Version: 1.0',
                 'Content-Type: text/plain; charset=UTF-8',
-                'Reply-To: ' . MAILFLOW_REPLY_TO,
+                'Reply-To: ' . $replyToFormatted,
             ];
             $data = implode("\r\n", $headers) . "\r\n\r\n" . $body;
         }

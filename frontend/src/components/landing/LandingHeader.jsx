@@ -1,28 +1,45 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CreditCard, HelpCircle, LogIn, Menu, ShieldCheck, Sparkles, UserPlus, X } from "lucide-react";
+import { ArrowRight, CreditCard, Crosshair, HelpCircle, LogIn, Menu, ShieldCheck, Sparkles, UserPlus, X } from "lucide-react";
 import BrandLogo from "../BrandLogo";
 
 export default function LandingHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#060911]/80 backdrop-blur-xl transition-all">
+    <header className={`sticky top-0 z-50 transition-all duration-300 ${
+      scrolled 
+        ? "bg-[#060911]/95 backdrop-blur-2xl border-b border-white/10 shadow-2xl shadow-black/80" 
+        : "bg-[#060911]/80 backdrop-blur-xl border-b border-white/[0.06]"
+    }`}>
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Link to="/" className="group" aria-label="Mail Flow home">
           <BrandLogo className="h-10 w-auto max-w-[190px] object-contain transition-transform duration-300 group-hover:scale-[1.02]" />
         </Link>
 
-        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-300 md:flex">
-          <a href="#features" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+        <nav className="hidden items-center gap-7 text-sm font-medium text-slate-300 md:flex">
+          <a href="/#features" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
             <Sparkles className="h-4 w-4 text-indigo-400" />
             <span>Features</span>
           </a>
-          <a href="#pricing" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+          <Link to="/lead-hunter" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+            <Crosshair className="h-4 w-4 text-emerald-400" />
+            <span>Lead Hunter</span>
+          </Link>
+          <a href="/#pricing" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
             <CreditCard className="h-4 w-4 text-emerald-400" />
             <span>Pricing</span>
           </a>
-          <a href="#security" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
+          <a href="/#security" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-white">
             <ShieldCheck className="h-4 w-4 text-cyan-400" />
             <span>Security</span>
           </a>
@@ -61,15 +78,19 @@ export default function LandingHeader() {
 
       {mobileOpen && (
         <div className="flex animate-in flex-col gap-4 border-t border-white/10 bg-[#060911]/98 px-6 py-5 text-sm font-medium text-slate-200 backdrop-blur-2xl slide-in-from-top-2 md:hidden">
-          <a href="#features" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+          <a href="/#features" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
             <Sparkles className="h-4 w-4 text-indigo-400" />
             <span>Features</span>
           </a>
-          <a href="#pricing" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+          <Link to="/lead-hunter" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+            <Crosshair className="h-4 w-4 text-emerald-400" />
+            <span>Lead Hunter</span>
+          </Link>
+          <a href="/#pricing" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
             <CreditCard className="h-4 w-4 text-emerald-400" />
             <span>Pricing</span>
           </a>
-          <a href="#security" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
+          <a href="/#security" onClick={() => setMobileOpen(false)} className="flex items-center gap-2 py-1 hover:text-indigo-400">
             <ShieldCheck className="h-4 w-4 text-cyan-400" />
             <span>Security</span>
           </a>

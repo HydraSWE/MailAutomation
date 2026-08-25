@@ -1,604 +1,307 @@
-# Mail Flow - Enterprise Email Campaign Platform
-<img width="1919" height="361" alt="1000218256" src="https://github.com/user-attachments/assets/0fee1faa-7c70-4d1f-bc22-b8593a140974" />
-<img width="2158" height="445" alt="1000218259" src="https://github.com/user-attachments/assets/4c115ce2-e607-41e6-aefd-b76ac5993638" />
+# Mail Flow & Lead Hunter : Enterprise B2B Outreach Ecosystem
 
+<div align="center">
 
-A multi-tenant SaaS platform for bulk email campaigns, built with **Django REST Framework**, **PostgreSQL**, **Celery + Redis**, and **React (Vite)**. It ships with a full billing system that accepts on-chain **USDT** payments across four blockchains, a five-tier RBAC model, per-organization quota enforcement, click/unsubscribe tracking, a support-ticket desk, and a real-time platform administration console.
+<img width="1919" height="361" alt="Mail Flow Platform Hero" src="https://github.com/user-attachments/assets/0fee1faa-7c70-4d1f-bc22-b8593a140974" />
+<img width="2158" height="445" alt="Mail Flow Dashboard Overview" src="https://github.com/user-attachments/assets/4c115ce2-e607-41e6-aefd-b76ac5993638" />
 
-### Modular architecture
+<p align="center">
+  <strong>The Complete Enterprise Outbound Suite: Multi-Tenant Bulk Email Orchestration & Real-Time B2B Client Hunter</strong>
+</p>
 
-- Billing services and views expose compatibility facades from
-  `billing.services` and `billing.views`, with focused domain import modules
-  underneath them.
-- User authentication cookies live in `users.auth_cookies`; `users.views`
-  remains a stable facade for existing URL configuration.
-- Large frontend routes are thin page shells over settings, email-builder,
-  campaign-wizard, and recipient-import workspaces.
-- The stylesheet entry point defines stable cascade layers while legacy
-  selectors are migrated incrementally with visual coverage.
+[![Django](https://img.shields.io/badge/Backend-Django%205.1%20%7C%20DRF-092E20?style=for-the-badge&logo=django&logoColor=white)](https://www.djangoproject.com/)
+[![React](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite%205-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Styles-Tailwind%20CSS%20v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20Redis-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Celery](https://img.shields.io/badge/Workers-Celery%20%7C%20Redis-37814A?style=for-the-badge&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
+[![Chrome Extension](https://img.shields.io/badge/Extension-Manifest%20V3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
+[![Docker](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
-Verification commands:
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [1. Ecosystem Architecture Overview](#1-ecosystem-architecture-overview)
+- [2. System 1 : Mail Flow (Core SaaS Platform)](#2-system-1--mail-flow-core-saas-platform)
+  - [Core Campaign Engine](#core-campaign-engine)
+  - [Multi-Tenant Quotas & 5-Tier RBAC](#multi-tenant-quotas--5-tier-rbac)
+  - [On-Chain Multi-Network USDT Billing](#on-chain-multi-network-usdt-billing)
+  - [Click & Unsubscribe Tracking](#click--unsubscribe-tracking)
+  - [Mail Workspace & Support Ticket Desk](#mail-workspace--support-ticket-desk)
+- [3. System 2 : Mail Flow Lead Hunter (Companion Suite)](#3-system-2--mail-flow-lead-hunter-companion-suite)
+  - [Multi-Channel Scraper Engines](#multi-channel-scraper-engines)
+  - [1-Click Real-Time Push Pipeline](#1-click-real-time-push-pipeline)
+  - [Licensing, Quotas & 2-Device Policy](#licensing-quotas--2-device-policy)
+  - [Extension Installation (Developer Mode & Web Store)](#extension-installation-developer-mode--web-store)
+- [4. Visual Design System & Component Hierarchy](#4-visual-design-system--component-hierarchy)
+- [5. Complete API Reference](#5-complete-api-reference)
+- [6. Security & Cryptographic Invariants](#6-security--cryptographic-invariants)
+- [7. Verification, Testing & Build Commands](#7-verification-testing--build-commands)
+- [8. Deployment & Environment Setup](#8-deployment--environment-setup)
+- [9. Responsible Use & License](#9-responsible-use--license)
+
+---
+
+## 1. Ecosystem Architecture Overview
+
+The Mail Flow ecosystem connects high-intent B2B prospect extraction with automated cold email dispatch through an asynchronous, event-driven pipeline:
+
+```
+[ B2B PROSPECTS & SOURCES ]
+  ├── Google Maps B2B Local Businesses (Phone, Address, Ratings, Web)
+  ├── Facebook Community Groups & Public Business Pages
+  ├── Instagram Business Profiles (Bio Emails, Follower Counts, Tags)
+  └── Fiverr High-Budget Gig Buyers & Client Feedback
+         │
+         ▼
+[ MAIL FLOW LEAD HUNTER (Chrome Extension MV3) ]
+  ├── Client-Side DOM Scraper & Regex Extraction Engines
+  ├── Real-Time Local Deduplication & Clean RFC 4180 CSV Export
+  └── Cryptographic Hardware Binding (HMAC-SHA256 / 2-Device Policy)
+         │
+         ▼  (1-Click HTTP Push with Secret Header & HMAC Signature)
+[ PHP CENTRAL LICENSING & RELAY SERVER (mail.annomous.com) ]
+  ├── License Validation, Token Issuance & 6-Digit OTP Device Transfer
+  └── Webhook Dispatch via callDjangoMailFlowApi()
+         │
+         ▼
+[ MAIL FLOW CORE DJANGO BACKEND (mailflow.annomous.com) ]
+  ├── Multi-Tenant Organization Isolation & Automatic List Mapping
+  ├── Fernet-Encrypted SMTP Accounts & Round-Robin Rotation
+  ├── Celery Asynchronous Dispatch Queues & Redis Rate Throttles
+  └── On-Chain USDT Payment Verification (BSC, ETH, TRON, TON)
+         │
+         ▼
+[ MAIL FLOW OPERATIONS CONSOLE (mail-flow.annomous.com) ]
+  ├── React 18 + Vite 5 + Tailwind CSS v4 Dashboard
+  ├── Drag-and-Drop HTML Email Builder & Personalization
+  ├── Live Campaign Real-Time Polling & Click Analytics
+  └── Dedicated Public /lead-hunter Interactive Showcase
+```
+
+---
+
+## 2. System 1 : Mail Flow (Core SaaS Platform)
+
+### Core Campaign Engine
+- **Template Builder**: Visual HTML email editor and JSON layout storage with live mobile/desktop previews.
+- **Merge Personalization**: Dynamic `{{name}}`, `{{email}}`, `{{company}}`, and custom recipient attributes.
+- **Persistent Dispatch Logs**: Per-recipient status tracking (`Queued`, `Dispatched`, `Delivered`, `Failed`, `Bounced`, `Unsubscribed`).
+- **Smart Queue Throttling**: Batch size controls, inter-email delay randomization, and auto-retry backoff.
+
+### Multi-Tenant Quotas & 5-Tier RBAC
+- **Strict Tenant Isolation**: All records bound to `organization_id` with `PROTECT`-level database foreign keys.
+- **5-Tier Role Matrix**:
+  - `->` **Owner**: Global platform administration, payment reviews, user and organization oversight.
+  - `->` **Admin**: Organization configuration, SMTP connection management, team seats, billing renewals.
+  - `->` **Manager**: Campaign creation, list management, file imports, broadcast execution.
+  - `->` **Operator**: Campaign launching, template adjustments, log viewing.
+  - `->` **Viewer**: Read-only access to campaign summaries and report dashboards.
+
+### On-Chain Multi-Network USDT Billing
+- **Direct Crypto Settlement**: Native on-chain verification across **BSC (BEP-20)**, **Ethereum (ERC-20)**, **Tron (TRC-20)**, and **TON**.
+- **Deterministic Micro-Pricing**: Generates unique 6-decimal amounts (e.g. `29.004128 USDT`) with 72-hour expiration for automated zero-mismatch reconciliation.
+- **Public Checkout Session**: 6-digit email OTP verification, Cloudflare Turnstile bot protection, and instant account onboarding.
+
+### Click & Unsubscribe Tracking
+- **Cryptographic Tracking**: Fernet-encrypted tracking tokens per recipient with SHA-256 salted IP anonymization.
+- **RFC 8058 Compliance**: Automatic `List-Unsubscribe` and `List-Unsubscribe-Post` one-click header injection.
+
+### Mail Workspace & Support Ticket Desk
+- **IMAP / SMTP Sync**: Encrypted credentials for mailbox synchronization and unified team ticket threads.
+- **Inbound Ticketing**: Auto-generates support tickets from customer replies with priority tagging.
+
+---
+
+## 3. System 2 : Mail Flow Lead Hunter (Companion Suite)
+
+Mail Flow Lead Hunter is the enterprise B2B lead generation companion tool designed to feed verified prospect lists straight into Mail Flow campaigns with zero CSV friction.
+
+<div align="center">
+  <img width="900" alt="Lead Hunter Live Extraction Engine" src="https://mail.annomous.com/lead-hunter/logo.png" />
+</div>
+
+### Multi-Channel Scraper Engines
+
+| Scraper Channel | Target Prospects | Extracted Data Fields | Extraction Speed |
+|:---|:---|:---|:---|
+| **Google Maps B2B** | Local business owners, dentists, contractors, lawyers | Business name, verified phone, website, physical address, Google rating, review counts, map coordinates | ~50 leads / 10s |
+| **Facebook Pages & Groups** | Group members, niche community founders, e-com stores | Page email, phone, messenger URL, group member profile links, role titles | ~40 leads / 15s |
+| **Instagram Bio Hunter** | Influencers, DTC brands, creators, agency founders | Bio business emails, phone regex matches, website link, follower/following count, verified badge | ~60 leads / 12s |
+| **Fiverr Client Hunter** | High-ticket business buyers, agency clients | Active buyer usernames, total review spend history, gig review ratings, country origin (US, UK, CA, AU, EU) | ~30 leads / 8s |
+
+### 1-Click Real-Time Push Pipeline
+- **Zero Export Hassle**: Scraped contacts push directly into the active Mail Flow organization via `/api/recipients/push_leads/`.
+- **Automatic Audience Deduplication**: Normalizes email formats, strips invalid records, and merges with existing lists.
+- **Instant Campaign Trigger**: Configurable auto-dispatch to immediately enroll new leads in active cold email sequences.
+
+### Licensing, Quotas & 2-Device Policy
+- **Included Free for Paid Users**: Every active Mail Flow paid subscriber unlocks Lead Hunter automatically using their account email.
+- **Tier Quota Breakdown**:
+  - `->` **Starter Plan**: 2,500 Recipient Quota / 250 Batch Limit
+  - `->` **Pro Plan**: 10,000 Recipient Quota / 500 Batch Limit
+  - `->` **Enterprise Plan**: 50,000+ Recipient Quota / 1,000 Batch Limit
+- **2-Device Security**: Cryptographic hardware binding allows up to 2 active computers per license. A 3rd workstation triggers an automated 6-digit OTP device transfer verification.
+
+### Extension Installation (Developer Mode & Web Store)
+- **Direct Package Download**: [**`https://mail.annomous.com/lead-hunter/lead-hunter.zip`**](https://mail.annomous.com/lead-hunter/lead-hunter.zip)
+- **4-Step Developer Mode Setup**:
+  1. `->` Download and extract `lead-hunter.zip` to a local folder.
+  2. `->` In Google Chrome, navigate to `chrome://extensions`.
+  3. `->` Toggle on **Developer mode** (top-right) and click **Load unpacked**.
+  4. `->` Select the extracted folder, open the extension, and enter your active Mail Flow account email.
+- **Chrome Web Store**: Currently tagged as *Coming Soon / Under Review*.
+
+---
+
+## 4. Visual Design System & Component Hierarchy
+
+The web interface adheres strictly to a modern, dark glassmorphism design standard:
+
+```
+frontend/src/
+├── components/
+│   ├── BrandLogo.jsx                       # Master brand logo with multi-variant asset support
+│   ├── landing/
+│   │   ├── LandingHeader.jsx               # Sticky scroll-elevated parent SaaS navigation
+│   │   ├── LandingHero.jsx                 # Dynamic monitor widget & headline
+│   │   ├── LandingFeatures.jsx             # Grid feature highlights
+│   │   ├── LandingPricing.jsx              # Tiered subscription selector & custom quote modal
+│   │   └── LandingFooter.jsx               # Ecosystem footer with quick links
+│   └── lead-hunter/
+│       ├── LeadHunterHeader.jsx            # Sticky scroll-elevated Lead Hunter navbar
+│       ├── LeadHunterHero.jsx              # Hero section with official logo & value pillars
+│       ├── LeadHunterInteractiveScraper.jsx# Live simulated extraction engine with 4 channels
+│       ├── LeadHunterInstallationGuide.jsx # 4-step Developer Mode .ZIP installation walkthrough
+│       ├── LeadHunterChannels.jsx          # Deep-dive scraper engine cards
+│       └── LeadHunterPlanQuotas.jsx        # Free plan quota comparison table
+└── pages/
+    ├── Landing.jsx                         # Main Mail Flow landing page (/)
+    └── LeadHunterPublic.jsx                # Dedicated Lead Hunter public showcase (/lead-hunter)
+```
+
+### UI & Styling Rules
+- `->` **Sticky Navigation**: Header transitions dynamically to `bg-[#060911]/95 backdrop-blur-2xl` with shadow elevation on scroll.
+- `->` **Input Icon Padding Rule**: Input containers with prefix icons strictly enforce `!pl-12` (48px clearance) to eliminate placeholder overlap.
+- `->` **Arrow Placement Rule**: Directional icons and arrows (`<ArrowRight />`) are positioned at the start of links and button labels.
+- `->` **Typography**: Zero em dashes (`—`) or en dashes (`–`) in product UI; clean standard hyphens and colons only.
+
+---
+
+## 5. Complete API Reference
+
+### Lead Hunter & Push Pipeline
+
+| Method | Endpoint | Access | Description |
+|:---|:---|:---|:---|
+| `POST` | `/api/recipients/push_leads/` | Relay / Secret | Receives scraped batches and auto-creates lists |
+| `GET` | `/api/recipient-lists/summary/` | Authenticated | Fetches audience counts and sync statistics |
+| `GET` | `/api/billing/platform/lead-hunter/licenses/` | Owner Only | Lists all issued Lead Hunter extension licenses |
+| `POST` | `/api/billing/platform/lead-hunter/licenses/` | Owner Only | Provisions custom quotas or manual extension access |
+| `POST` | `/api/billing/platform/lead-hunter/licenses/{key}/action/` | Owner Only | Extends, suspends, adjusts limits, or resets HWID |
+
+### Campaign Management
+
+| Method | Endpoint | Access | Description |
+|:---|:---|:---|:---|
+| `GET` | `/api/campaigns/` | Org Users | Lists organization campaigns with pagination |
+| `POST` | `/api/campaigns/` | Admin / Manager | Creates a new campaign with templates and lists |
+| `POST` | `/api/campaigns/{id}/launch/` | Admin / Manager | Dispatches Celery asynchronous email workers |
+| `GET` | `/api/campaigns/{id}/progress/` | Org Users | Polls live dispatch progress and delivery metrics |
+
+### Billing & USDT Crypto Invoices
+
+| Method | Endpoint | Access | Description |
+|:---|:---|:---|:---|
+| `GET` | `/api/billing/plans/` | Public | Retrieves active subscription plans and pricing |
+| `POST` | `/api/billing/invoices/` | Public / User | Generates micro-rate USDT payment invoice |
+| `POST` | `/api/billing/invoices/{id}/verify/` | Public / User | Submits on-chain transaction hash for verification |
+| `GET` | `/api/billing/platform/payment-reviews/` | Owner Only | Admin queue for manual blockchain review |
+
+---
+
+## 6. Security & Cryptographic Invariants
+
+- **Fernet Encryption at Rest**: SMTP passwords, mailbox credentials, API keys, and tracking tokens are encrypted using AES-128-CBC with HMAC-SHA256 authentication.
+- **Hardware-Bound JWT Tokens**: Lead Hunter issues HMAC-SHA256 tokens bound to unique SHA-256 hardware fingerprints.
+- **httpOnly Cookie Transport**: Access and refresh JWT tokens are transmitted exclusively over secure, httpOnly SameSite cookies.
+- **Zero Raw IP Retention**: Click and unsubscribe tracking hashes visitor IP addresses using SHA-256 with an isolated server salt.
+- **Custody-Free Crypto**: No private keys or wallet seeds are stored on servers; verification utilizes public blockchain explorers.
+
+---
+
+## 7. Verification, Testing & Build Commands
+
+Run the full automated test and verification suite:
 
 ```bash
+# 1. Backend Django Checks & Migrations
 cd backend && ../.venv/Scripts/python manage.py check
 cd backend && ../.venv/Scripts/python manage.py makemigrations --check --dry-run
 cd backend && ../.venv/Scripts/python manage.py test billing.tests users.tests --settings=config.test_settings
-cd frontend && npm test && npm run test:visual -- --workers=1 && npm run build
-python generate_email_previews.py
+
+# 2. Frontend React Tests, Linting & Vite Production Build
+cd frontend && npm test
+cd frontend && npm run build
+
+# 3. Lead Hunter Extension Package Validation
+cd D:/Tools/MailAutomation-LeadHunt && npm run build:zip
+
+# 4. PHP Relay Syntax Checks
 php -l deploy/php/mailflow-otp-relay.php
 php -l deploy/php/mailflow-smtp-test-relay.php
 php -l deploy/php/mailflow-campaign-relay.php
 php -l deploy/php/mailflow-imap-sync-relay.php
-```
-
-Visual baselines live beside `frontend/tests/visual/workflows.spec.js` and cover
-settings, platform organizations/users, the template builder, campaign wizard,
-and recipient import at mobile, tablet, and desktop widths. Regenerate them only
-after reviewing an intentional UI change with `npm run test:visual:update`.
-
-Billing HTML is sourced only from `backend/templates/emails/billing`. The root
-preview command boots Django and renders deterministic sample contexts through
-the same production context builders; generated preview HTML and its gallery are
-build artifacts rather than editable email sources.
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [User Roles & Permissions](#user-roles--permissions)
-- [Subscription Plans & Billing](#subscription-plans--billing)
-- [Email Engine](#email-engine)
-- [Campaign Tracking](#campaign-tracking)
-- [Support Desk (Mail Workspace)](#support-desk-mail-workspace)
-- [Platform Administration](#platform-administration)
-- [Notifications & Broadcasts](#notifications--broadcasts)
-- [Reports & Analytics](#reports--analytics)
-- [Database Backups](#database-backups)
-- [API Reference](#api-reference)
-- [Security](#security)
-- [Responsible Use](#responsible-use)
-
----
-
-## Features
-
-### Core Campaign System
-- Email template management with HTML editor and JSON layouts
-- Recipient list management with CSV/XLSX import, search, filtering, and export
-- Campaign creation, immediate launch, scheduling, pause/cancel, and retry
-- Persistent per-recipient delivery logs with status tracking
-- Real-time campaign progress polling
-
-### Email Delivery Engine
-- Multiple SMTP accounts per organization with encrypted-at-rest passwords (Fernet)
-- Batched sending with configurable batch size and inter-email delay
-- Per-SMTP daily sending limits and per-organization quotas (daily / weekly / monthly)
-- Automatic retry with configurable count and delay
-- Plaintext fallback and `List-Unsubscribe` / `List-Unsubscribe-Post` header injection
-- External relay fallback (OTP, SMTP test, campaign sending via optional external APIs)
-- Template personalization with `{{name}}`, `{{email}}`, `{{company}}` merge tags
-
-### Click & Unsubscribe Tracking
-- Fernet-encrypted tracking tokens per campaign log entry
-- Automatic link rewriting to redirect through click-tracking endpoints
-- One-click unsubscribe with RFC 8058 `List-Unsubscribe-Post` support
-- Anonymized IP hashing (SHA-256 with secret salt) — no raw IPs stored
-- Configurable tracking toggle per organization via settings
-
-### Multi-Tenant Organization System
-- Full organization isolation with `PROTECT`-level foreign keys
-- Five user roles: **Owner → Admin → Manager → Operator → Viewer**
-- Per-organization limits: users, admins, SMTP accounts, recipients, daily campaigns
-- Usage tracking with daily/weekly/monthly email quotas and campaign launch caps
-- Organization status management: Active / Suspended / Expired
-
-### Subscription & USDT Billing
-- Four configurable subscription plans with original price, discount, and calculated payable price
-- Free plan with automatic period rolling (30-day cycles)
-- Direct USDT payments on **BSC**, **Ethereum**, **Tron**, and **TON** networks
-- Time-limited invoices with unique six-decimal USDT amounts
-- On-chain transaction verification with configurable confirmation thresholds
-- Checkout session with OTP email verification and Turnstile CAPTCHA
-- Transfer ledger with resolution audit trail (auto-activated, manual review, refunded, rejected)
-- Payment security audit events with actor and IP hash tracking
-- Free-plan abuse prevention via IP hash and email hash uniqueness
-
-### Authentication & Security
-- Session-backed JWT authentication with httpOnly cookie transport
-- Single active session enforcement for owner accounts
-- Session management: list, revoke, IP and user-agent tracking
-- Two-Factor Authentication (TOTP) with QR code provisioning and backup codes
-- Short-lived 2FA challenge tokens for step-up login flow
-- Password change with current-password verification
-- Cloudflare Turnstile integration for public checkout flows
-- Rate limiting on login, file imports, SMTP tests, campaign launches, password changes, and payment endpoints
-- HSTS, CSP, X-Frame-Options DENY, Referrer-Policy, CSRF protection
-
-### Support Desk (Mail Workspace)
-- IMAP/SMTP mailbox configuration with encrypted credentials
-- Support ticket system with ticket numbers, priority levels, and status workflow
-- Inbound/outbound/internal message threads per ticket
-- Plan-gated feature (available on Premium+ and Custom plans)
-
-### Platform Administration (Owner Console)
-- Platform overview dashboard with system-wide stats
-- Organization management: create, edit, suspend, delete organizations
-- User management across all organizations
-- Plan administration: create and edit subscription plans
-- Payment review: approve, reject, or refund pending transactions
-- BSC transaction inspector for on-chain verification
-- Platform-wide broadcast emails with role, plan, and status targeting
-- Active session monitoring across all users
-- Billing configuration: wallet addresses, exchange rates, API keys
-
-### Notifications System
-- In-app notification center with unread badge counts
-- Notification types: Broadcast, Billing, Support, System
-- Mark as read / mark all as read
-- Linked to platform broadcasts for deduplication
-
-### Reports & Analytics
-- Summary dashboard: total campaigns, deliveries, success rate, active recipients
-- Daily volume charts, success ratio breakdown, campaign performance comparison
-- SMTP usage distribution and top failure reasons
-- Per-campaign detailed reports with click analytics and top-clicked links
-- Campaign timeline (created → dispatched → completed)
-- CSV export for delivery logs
-
-### Database Backup System
-- Automated daily database backups via Celery Beat (3:00 AM)
-- Gzip-compressed JSON dumps of all business data
-- Upload to Vercel Blob with automatic retention pruning (14 backups)
-- Download and restore from backup files
-- Manual backup trigger via admin API
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     React (Vite) Frontend                                   │
-│   Landing ─ Register ─ Subscribe ─ Payment ─ Dashboard Shell               │
-│    Templates ─ Recipients ─ Campaigns ─ SMTP ─ Reports                     │
-│    Settings ─ Platform Admin ─ Account Admin ─ Notifications               │
-│    Help & Support ─ Mail Workspace                                          │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ Axios (JWT via httpOnly cookies)
-┌──────────────────────────▼──────────────────────────────────────┐
-│                  Django REST Framework API                                  │
-│  Gunicorn ─ WhiteNoise ─ CORS ─ SecurityHeaders middleware                 │
-├─────────────────────────────────────────────────────────────────┤
-│  users ─ common ─ billing ─ campaigns ─ templates_app                      │
-│  recipients ─ smtp_manager ─ email_engine ─ dashboard                      │
-│  reports ─ support ─ platform_broadcasts ─ notifications                   │
-└──────┬──────────────┬───────────────────┬───────────────────────┘
-        │                 │                      │
-  PostgreSQL       Redis                   Celery Workers
-  (via dj-db-url)  (broker + cache)        ├─ campaign dispatch
-                                           ├─ invoice expiry
-                                           ├─ broadcast delivery
-                                           └─ daily DB backup
+php -l deploy/php/mailflow-leadhunt-relay.php
 ```
 
 ---
 
-## Tech Stack
+## 8. Deployment & Environment Setup
 
-| Layer            | Technology                                                              |
-|------------------|-------------------------------------------------------------------------|
-| **Backend**      | Python 3.12+, Django 5.1, Django REST Framework 3.15                    |
-| **Frontend**     | React 18, Vite 5, React Router 7, Tailwind CSS 4, Recharts 3           |
-| **Database**     | PostgreSQL 16 (SQLite for development)                                  |
-| **Task Queue**   | Celery 5.4 with Redis broker                                           |
-| **Cache**        | Redis 7 (production) / LocMemCache (development)                       |
-| **Auth**         | SimpleJWT with token blacklisting, pyOTP for 2FA                       |
-| **Encryption**   | Fernet (cryptography 44.x) for SMTP passwords, tracking tokens, API keys|
-| **Payments**     | Direct USDT on BSC, Ethereum, Tron, TON via RPC/API                    |
-| **Storage**      | Local filesystem or Vercel Blob (configurable)                          |
-| **Icons**        | Lucide React                                                            |
-| **Server**       | Gunicorn 23 + WhiteNoise for static files                               |
-| **Container**    | Docker Compose with MailHog for dev email capture                       |
+### Docker Compose Quickstart
 
----
+```bash
+# Clone repository and enter project directory
+cd d:/Tools/MailAutomation
 
-## Project Structure
+# Configure environment variables
+cp .env.example .env
 
+# Build and launch all multi-container services
+docker compose up -d --build
 ```
-MailAutomation/
-├── backend/
-│   ├── config/              # Django settings, URLs, Celery, WSGI/ASGI
-│   ├── users/               # Custom User model, JWT auth, 2FA, sessions, RBAC
-│   ├── common/              # Organization, SystemSetting, BillingConfig, quotas, backup, storage
-│   ├── billing/             # Plans, subscriptions, USDT invoices, blockchain verification, checkout
-│   ├── campaigns/           # Campaign CRUD, scheduling, logs, click/unsubscribe tracking
-│   ├── templates_app/       # Email template builder with HTML validation
-│   ├── recipients/          # Recipient lists, CSV/XLSX import/export
-│   ├── smtp_manager/        # SMTP account CRUD, connection testing, encrypted passwords
-│   ├── email_engine/        # Sending engine, relay fallback, personalization, queue/retry
-│   ├── dashboard/           # Dashboard summary statistics
-│   ├── reports/             # Campaign reports, delivery logs, analytics, CSV export
-│   ├── support/             # Support mailboxes, tickets, messages (Mail Workspace)
-│   ├── platform_broadcasts/ # Owner-to-platform broadcast emails
-│   ├── notifications/       # In-app notification center
-│   ├── Dockerfile           # Development Dockerfile
-│   └── Dockerfile.prod      # Production multi-stage Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── pages/           # All page components (Dashboard, Templates, Campaigns, etc.)
-│   │   ├── components/      # Reusable UI components (Sidebar, Navbar, Tables, Charts, etc.)
-│   │   ├── context/         # React context (ToastProvider)
-│   │   ├── hooks/           # Custom React hooks
-│   │   ├── layouts/         # AppLayout with sidebar/navbar shell
-│   │   ├── services/        # Axios API client configuration
-│   │   └── utils/           # Auth helpers, formatters
-│   ├── Dockerfile           # Development Dockerfile
-│   └── Dockerfile.prod      # Production multi-stage Dockerfile (Nginx)
-├── deploy/                  # Nginx and PHP deployment configs
-├── docker-compose.yml       # Development compose (PostgreSQL, Redis, MailHog, backend, Celery, frontend)
-├── docker-compose.prod.yml  # Production compose
-├── .env.example             # All environment variables with documentation
-├── DEPLOYMENT.md            # Comprehensive deployment guide
-└── PRODUCTION_DEPLOYMENT.md # Quick production deployment checklist
+
+### Core Environment Variables
+
+```ini
+# Django Application
+DJANGO_SECRET_KEY=your-production-django-secret
+DEBUG=False
+ALLOWED_HOSTS=mailflow.annomous.com,localhost,127.0.0.1
+FRONTEND_URL=https://mail-flow.annomous.com
+
+# Database (PostgreSQL)
+DATABASE_URL=postgres://mailflow:password@postgres:5432/mailflow_db
+
+# Asynchronous Broker (Redis)
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# Security & Relays
+FERNET_KEY=your-32-byte-base64-fernet-key
+MAIL_FLOW_OTP_RELAY_URL=https://mail.annomous.com/mailflow-otp-relay.php
+MAIL_FLOW_OTP_RELAY_SECRET=your-relay-secret-key
+MAIL_FLOW_LEADHUNT_RELAY_URL=https://mail.annomous.com/mailflow-leadhunt-relay.php
 ```
----
-
-## User Roles & Permissions
-
-The platform enforces a hierarchical five-role RBAC model:
-
-| Role         | Scope                  | Capabilities                                                                                          |
-|--------------|------------------------|-------------------------------------------------------------------------------------------------------|
-| **Owner**    | Platform-wide          | Full platform administration, organization management, plan management, payment reviews, broadcasts    |
-| **Admin**    | Organization           | Organization settings, user management, template/recipient/campaign/SMTP CRUD, reports, billing        |
-| **Manager**  | Organization           | Template/recipient/campaign/SMTP CRUD, imports, campaign creation, reports                              |
-| **Operator** | Organization           | View templates, recipients, campaigns, SMTP, reports; limited write access                             |
-| **Viewer**   | Organization (read-only)| Read-only access to dashboard, templates, recipients, campaigns, SMTP, reports                         |
-
-- The **Owner** is the platform superuser and has a dedicated admin console at `/platform`.
-- **Admin** users manage their organization at `/account` and `/settings`.
-- Session enforcement: Owner accounts are limited to a single active session.
 
 ---
 
-## Subscription Plans & Billing
+## 9. Responsible Use & License
 
-### Plans
+> [!IMPORTANT]
+> **Anti-Spam Compliance**: Only send cold outreach to recipients in compliance with CAN-SPAM, GDPR, and CASL regulations. Always include verified physical business addresses and functional unsubscribe mechanisms.
 
-Plans are defined in the Django admin or via the Owner's Platform Plans page. Each plan specifies:
-
-- Monthly price (BDT) with optional discount percentage
-- Email limits: monthly, daily, weekly
-- Max admins, users, SMTP accounts, recipients, campaigns per day
-- Free plan flag (auto-rolling 30-day periods)
-
-### Checkout Flow
-
-1. User selects a plan → Register page → Email verification (OTP) with Turnstile
-2. Invoice created with unique USDT amount calculated from `price_bdt ÷ USDT_BDT_RATE`
-3. User selects blockchain network (BSC / Ethereum / Tron / TON)
-4. Payment page shows wallet address, amount, and countdown timer
-5. User submits transaction hash → Backend verifies on-chain
-6. On success: Organization + Subscription provisioned, confirmation email sent
-7. On failure or ambiguity: Invoice flagged for manual review
-
-### Payment Verification
-
-For each network, the backend verifies:
-- USDT contract address matches the configured allow-list
-- Receiving wallet matches the platform wallet
-- Amount matches (within token decimals precision)
-- Transaction has sufficient confirmations (configurable per network)
-- Transaction hash is not already consumed (idempotency)
-
----
-
-## Email Engine
-
-The email engine (`email_engine/sender.py`) processes campaign logs atomically:
-
-1. **Quota gate** — Validates organization is active, checks daily/weekly/monthly quotas, SMTP daily limit
-2. **Personalization** — Renders `{{name}}`, `{{email}}`, `{{company}}` merge tags in subject and HTML
-3. **Tracking injection** — Appends unsubscribe footer, rewrites links for click tracking
-4. **Delivery** — Attempts direct SMTP; falls back to external campaign relay on failure
-5. **Post-send** — Updates campaign log, SMTP daily counter, organization usage records
-
-### Celery Beat Scheduled Tasks
-
-| Task                                        | Schedule            |
-|---------------------------------------------|---------------------|
-| `campaigns.tasks.dispatch_scheduled_campaigns` | Every 60 seconds   |
-| `billing.tasks.expire_payment_invoices`        | Every 5 minutes    |
-| `common.tasks.auto_backup_database_task`       | Daily at 3:00 AM   |
-
----
-
-## Campaign Tracking
-
-- **Click tracking**: All links in campaign HTML are rewritten to pass through `/api/track/click/{token}/`. The token is a Fernet-encrypted payload containing the campaign log ID and destination URL.
-- **Unsubscribe**: Each email includes a `List-Unsubscribe` header and a footer link pointing to `/api/unsubscribe/{token}/`. Unsubscribing deactivates the recipient across all lists in the organization.
-- **Privacy**: IP addresses are never stored directly. A one-way SHA-256 hash (`SECRET_KEY + IP`) is recorded for abuse detection.
-
----
-
-## Support Desk (Mail Workspace)
-
-Available to organizations on **Premium+** or **Custom** plans with the workspace feature enabled:
-
-- **Mailbox configuration**: IMAP + SMTP credentials with Fernet-encrypted passwords
-- **Ticket system**: Auto-generated ticket numbers, priority levels (Normal / High / Urgent), status workflow (New → Open → Waiting → Resolved → Closed)
-- **Message threads**: Inbound, outbound, and internal notes per ticket
-- Accessible at `/mail-workspace` in the frontend (Owner and Admin roles)
-
----
-
-## Platform Administration
-
-The Owner's admin console at `/platform` provides:
-
-| Page                | Functionality                                                                  |
-|---------------------|--------------------------------------------------------------------------------|
-| **Overview**        | System-wide stats: total orgs, users, campaigns, revenue                      |
-| **Organizations**   | Full CRUD, suspend/activate, edit limits, view subscription details             |
-| **Users**           | Cross-org user management, role changes, account actions                        |
-| **Plans**           | Create/edit subscription plans, pricing, limits, display order                  |
-| **Billing**         | Payment review queue, transaction inspection, approve/reject/refund             |
-| **Broadcasts**      | Send platform-wide emails targeted by role, plan, or org status                 |
-| **Sessions**        | Monitor and revoke active user sessions across the platform                     |
-| **Settings**        | Billing configuration: wallet addresses, exchange rate, API keys                |
-
----
-
-## Notifications & Broadcasts
-
-### In-App Notifications
-
-Users receive notifications for:
-- Platform broadcast announcements
-- Billing events (invoice created, payment confirmed, subscription changes)
-- Support ticket updates
-- System alerts
-
-The notification bell shows unread count and supports mark-as-read and mark-all-read.
-
-### Platform Broadcasts
-
-The Owner can send targeted emails to platform users filtered by:
-- User role (admin, manager, operator, viewer)
-- Subscription plan
-- Organization status (active, suspended, expired)
-
-Broadcasts are processed asynchronously via Celery with per-user delivery tracking.
-
----
-
-## Reports & Analytics
-
-### Summary Report
-- Total campaigns, emails sent, success rate, active recipients
-- Daily volume chart (sent vs. failed over time)
-- Success ratio pie chart
-- Campaign performance comparison (top 5)
-- SMTP usage distribution
-- Top failure reasons
-
-### Campaign Detail Report
-- Per-campaign delivery breakdown: sent, failed, pending
-- Click analytics: total clicks, unique clicks, click rate
-- Top 10 clicked links with click counts
-- Campaign timeline: created → dispatched → completed
-
-### Delivery Logs
-- Searchable per-recipient delivery status with SMTP response messages
-- Filterable by campaign, status, and search query
-- CSV export capability
-
----
-
-## Database Backups
-
-The platform includes an automated backup system:
-
-- **Scheduled**: Celery Beat runs a daily backup at 3:00 AM
-- **Format**: Gzip-compressed JSON dump of all business data (users, recipients, campaigns, templates, SMTP, billing, etc.)
-- **Storage**: Uploaded to Vercel Blob with automatic pruning (keeps latest 14 backups)
-- **Restore**: Download and restore from any backup via admin endpoints
-- **Manual trigger**: Platform owner can trigger backups on demand
-
----
-
-## API Reference
-
-### Authentication
-
-| Method | Endpoint                          | Description                        |
-|--------|-----------------------------------|------------------------------------|
-| POST   | `/api/auth/token/`                | Obtain JWT access + refresh tokens |
-| POST   | `/api/auth/token/refresh/`        | Refresh access token               |
-| POST   | `/api/auth/logout/`               | Logout and revoke session          |
-| POST   | `/api/auth/2fa/setup/`            | Begin TOTP 2FA setup               |
-| POST   | `/api/auth/2fa/confirm/`          | Confirm 2FA setup with TOTP code   |
-| POST   | `/api/auth/2fa/disable/`          | Disable 2FA                        |
-| POST   | `/api/auth/2fa/verify-login/`     | 2FA step-up during login           |
-| POST   | `/api/auth/2fa/regenerate-backup-codes/` | Regenerate backup codes     |
-
-### User & Profile
-
-| Method | Endpoint                          | Description                          |
-|--------|-----------------------------------|--------------------------------------|
-| GET    | `/api/profile/`                   | Get current user profile             |
-| PUT    | `/api/profile/`                   | Update profile                       |
-| POST   | `/api/profile/change-password/`   | Change password                      |
-| GET    | `/api/users/`                     | List users (admin+)                  |
-| POST   | `/api/users/`                     | Create user (admin+)                 |
-| GET    | `/api/sessions/`                  | List active sessions                 |
-| POST   | `/api/sessions/{id}/revoke/`      | Revoke a session                     |
-
-### Organizations
-
-| Method | Endpoint                            | Description                         |
-|--------|-------------------------------------|-------------------------------------|
-| GET    | `/api/organizations/`               | List organizations                  |
-| POST   | `/api/organizations/`               | Create organization (owner)         |
-| GET    | `/api/organizations/{id}/`          | Get organization details            |
-| PUT    | `/api/organizations/{id}/`          | Update organization                 |
-| GET    | `/api/account/`                     | Get current org account summary     |
-| GET    | `/api/organization-usage/`          | Get org usage stats                 |
-| GET    | `/api/settings/`                    | Get organization settings           |
-| PUT    | `/api/settings/`                    | Update organization settings        |
-
-### Templates
-
-| Method | Endpoint              | Description              |
-|--------|-----------------------|--------------------------|
-| GET    | `/api/templates/`     | List email templates     |
-| POST   | `/api/templates/`     | Create template          |
-| GET    | `/api/templates/{id}/`| Get template details     |
-| PUT    | `/api/templates/{id}/`| Update template          |
-| DELETE | `/api/templates/{id}/`| Delete template          |
-
-### Recipients
-
-| Method | Endpoint                       | Description                     |
-|--------|--------------------------------|---------------------------------|
-| GET    | `/api/recipient-lists/`        | List recipient lists            |
-| POST   | `/api/recipient-lists/`        | Create recipient list           |
-| GET    | `/api/recipients/`             | List recipients                 |
-| POST   | `/api/recipients/`             | Create recipient                |
-| POST   | `/api/recipients/import_file/` | Import from CSV/XLSX            |
-| GET    | `/api/recipients/export_file/` | Export recipients               |
-
-### SMTP Accounts
-
-| Method | Endpoint                                | Description                  |
-|--------|-----------------------------------------|------------------------------|
-| GET    | `/api/smtp-accounts/`                   | List SMTP accounts           |
-| POST   | `/api/smtp-accounts/`                   | Create SMTP account          |
-| PUT    | `/api/smtp-accounts/{id}/`              | Update SMTP account          |
-| DELETE | `/api/smtp-accounts/{id}/`              | Delete SMTP account          |
-| POST   | `/api/smtp-accounts/{id}/test_connection/` | Test SMTP connection      |
-
-### Campaigns
-
-| Method | Endpoint                                  | Description                     |
-|--------|-------------------------------------------|---------------------------------|
-| GET    | `/api/campaigns/`                         | List campaigns                  |
-| POST   | `/api/campaigns/`                         | Create campaign                 |
-| GET    | `/api/campaigns/{id}/`                    | Get campaign details            |
-| POST   | `/api/campaigns/{id}/launch/`             | Launch campaign immediately     |
-| POST   | `/api/campaigns/{id}/schedule_campaign/`  | Schedule campaign               |
-| GET    | `/api/campaigns/{id}/progress/`           | Poll campaign progress          |
-| GET    | `/api/campaign-logs/`                     | List campaign delivery logs     |
-
-### Tracking
-
-| Method | Endpoint                              | Description                    |
-|--------|---------------------------------------|--------------------------------|
-| GET    | `/api/track/click/{token}/`           | Click redirect (public)        |
-| GET/POST| `/api/unsubscribe/{token}/`          | Unsubscribe (public)           |
-
-### Reports
-
-| Method | Endpoint                                  | Description                    |
-|--------|-------------------------------------------|--------------------------------|
-| GET    | `/api/reports/summary/`                   | Summary report with charts     |
-| GET    | `/api/reports/campaigns/`                 | Campaign report list           |
-| GET    | `/api/reports/campaign/{id}/`             | Campaign detail report         |
-| GET    | `/api/reports/delivery-logs/`             | Delivery logs with search      |
-| GET    | `/api/reports/delivery-logs/export/`      | Export delivery logs as CSV    |
-
-### Dashboard
-
-| Method | Endpoint                    | Description               |
-|--------|-----------------------------|---------------------------|
-| GET    | `/api/dashboard/summary/`  | Dashboard summary stats   |
-
-### Billing
-
-| Method | Endpoint                                        | Description                           |
-|--------|--------------------------------------------------|---------------------------------------|
-| GET    | `/api/billing/plans/`                            | List available plans (public)         |
-| POST   | `/api/billing/signup/free/`                      | Free plan signup                      |
-| POST   | `/api/billing/checkout/email/start/`             | Start email verification for checkout |
-| POST   | `/api/billing/checkout/email/verify/`            | Verify checkout OTP                   |
-| POST   | `/api/billing/invoices/`                         | Create payment invoice                |
-| GET    | `/api/billing/invoices/current/`                 | Get current pending invoice           |
-| GET    | `/api/billing/invoices/{id}/`                    | Get invoice details                   |
-| POST   | `/api/billing/invoices/{id}/verify/`             | Submit tx hash for verification       |
-| POST   | `/api/billing/invoices/{id}/replace/`            | Replace invoice (change network)      |
-| POST   | `/api/billing/invoices/{id}/cancel/`             | Cancel invoice                        |
-| POST   | `/api/billing/invoices/recover/`                 | Recover invoice by email              |
-| POST   | `/api/billing/account/invoices/`                 | Existing org renewal/upgrade invoice  |
-
-### Support
-
-| Method | Endpoint                    | Description                  |
-|--------|-----------------------------|------------------------------|
-| GET    | `/api/support/tickets/`     | List support tickets         |
-| POST   | `/api/support/tickets/`     | Create support ticket        |
-| GET    | `/api/support/messages/`    | List messages for a ticket   |
-| POST   | `/api/support/messages/`    | Send a message               |
-
-### Notifications
-
-| Method | Endpoint                           | Description                   |
-|--------|-------------------------------------|-------------------------------|
-| GET    | `/api/notifications/`              | List notifications            |
-| PATCH  | `/api/notifications/{id}/read/`    | Mark as read                  |
-| POST   | `/api/notifications/mark-all-read/`| Mark all as read              |
-
-### Platform (Owner Only)
-
-| Method | Endpoint                                              | Description                        |
-|--------|--------------------------------------------------------|------------------------------------|
-| GET    | `/api/billing/platform/plans/`                        | List/manage plans (admin)          |
-| POST   | `/api/billing/platform/plans/`                        | Create plan                        |
-| GET    | `/api/billing/platform/payment-reviews/`              | Payment review queue               |
-| POST   | `/api/billing/platform/payment-reviews/{id}/action/`  | Approve/reject/refund payment      |
-| POST   | `/api/billing/platform/bsc-transaction-inspect/`      | Inspect BSC transaction            |
-| GET    | `/api/platform/billing-configuration/`                | Get billing config                 |
-| PUT    | `/api/platform/billing-configuration/`                | Update billing config              |
-| GET    | `/api/platform-broadcasts/`                           | List broadcasts                    |
-| POST   | `/api/platform-broadcasts/`                           | Create and send broadcast          |
-
----
-
-## Security
-
-### Application Security
-- **Encryption at rest**: SMTP passwords, support mailbox credentials, API keys, and tracking tokens encrypted with Fernet
-- **JWT in httpOnly cookies**: Access and refresh tokens stored in secure, httpOnly, SameSite cookies
-- **Token rotation**: Refresh tokens are rotated on each use
-- **2FA**: RFC 6238 TOTP with ±1 window drift tolerance, QR code setup, 8 backup codes
-- **Rate limiting**: Configurable per-endpoint throttles (login, imports, launches, payments)
-- **Input validation**: Django REST Framework serializers with strict validation
-
-### Infrastructure Security
-- **HTTPS enforcement**: `SECURE_SSL_REDIRECT`, HSTS with 1-year max-age and preload
-- **CSP header**: Configurable Content Security Policy with Cloudflare Turnstile allowed
-- **CORS**: Explicit origin allow-list; no wildcards in production
-- **Security headers**: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`
-- **Production guards**: `ImproperlyConfigured` raised if debug enabled, weak secret key, missing encryption key, or wildcard hosts in production
-
-### Payment Security
-- Only public wallet addresses configured — **no private keys or seed phrases**
-- Transaction hash uniqueness enforced at the database level
-- Payment security audit events logged with actor and IP hash
-- Transfer ledger maintains full resolution history
-- Free plan claims deduplicated by IP hash and email hash
-
----
-
-## Responsible Use
-
-> **Only send to recipients who have explicitly opted in.** Add unsubscribe handling, suppression lists, bounce processing, and jurisdiction-specific compliance controls before production use. Never use purchased or scraped address lists.
-
----
-
-## License
-
-Mail Flow. All rights reserved.
+Copyright (c) 2026 Mail Flow Technologies. All rights reserved.

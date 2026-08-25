@@ -43,6 +43,7 @@ import Subscribe from "./pages/Subscribe";
 import Payment from "./pages/Payment";
 import ActivateCustomPlan from "./pages/custom_activation/ActivateCustomPlan";
 import HelpSupport from "./pages/HelpSupport";
+import LeadHunterPublic from "./pages/LeadHunterPublic";
 import MailWorkspace from "./pages/MailWorkspace";
 import NotificationsPage from "./pages/NotificationsPage";
 import RouteErrorBoundary from "./components/common/RouteErrorBoundary";
@@ -58,6 +59,7 @@ function ProtectedRoute({ element, roles }) {
 
 const router = createBrowserRouter([
   { path: "/", element: <Landing />, errorElement: <RouteErrorBoundary /> },
+  { path: "/lead-hunter", element: <LeadHunterPublic />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
   { path: "/register", element: <Register />, errorElement: <RouteErrorBoundary /> },
   { path: "/signup", element: <Register />, errorElement: <RouteErrorBoundary /> },

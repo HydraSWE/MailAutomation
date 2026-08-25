@@ -15,9 +15,12 @@ import {
   LockKeyhole,
   LogIn,
   Mail,
+  RefreshCw,
   Send,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
+  TrendingUp,
   User,
   X,
   Zap,
@@ -26,78 +29,156 @@ import {
   apiError,
   createCustomInvoice,
   createInvoice,
+  getOracleRates,
   getPlans,
   startCheckoutEmail,
   verifyCheckoutEmail,
 } from "../services/billingApi";
 
-const networks = [
-  {
-    id: "bsc",
-    name: "BNB Smart Chain",
-    protocol: "BEP-20",
-    badge: "Lowest Fee",
-    fee: "~$0.10 fee",
-    speed: "~3s confirmation",
-    accentColor: "emerald",
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
-        <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#F0B90B"/>
-        <path d="M16 6.5L20.25 10.75L16 15L11.75 10.75L16 6.5ZM21.75 12.25L26 16.5L21.75 20.75L17.5 16.5L21.75 12.25ZM10.25 12.25L14.5 16.5L10.25 20.75L6 16.5L10.25 12.25ZM16 18L20.25 22.25L16 26.5L11.75 22.25L16 18Z" fill="white"/>
-      </svg>
-    ),
-  },
-  {
-    id: "tron",
-    name: "TRON",
-    protocol: "TRC-20",
-    badge: "Popular",
-    fee: "~$1.50 fee",
-    speed: "~1m confirmation",
-    accentColor: "indigo",
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
-        <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#EB0029"/>
-        <path d="M24.7 9.8L7.6 6.5L14.4 25.5L24.7 9.8ZM19.5 11.2L11.5 9.7L15.3 14.8L19.5 11.2ZM15.3 17.5L12.5 21.6L10.3 11.3L15.3 17.5ZM17.1 14.8L21.7 11.5L16.2 21.5L17.1 14.8Z" fill="white"/>
-      </svg>
-    ),
-  },
-  {
-    id: "ton",
-    name: "TON Network",
-    protocol: "Jetton",
-    badge: "Ultra Fast",
-    fee: "~$0.05 fee",
-    speed: "Instant confirmation",
-    accentColor: "cyan",
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
-        <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#0088CC"/>
-        <path d="M22.5 9.5H9.5L8 12L16 24.5L24 12L22.5 9.5ZM11.2 11.5H20.8L16 19L11.2 11.5Z" fill="white"/>
-      </svg>
-    ),
-  },
-  {
-    id: "ethereum",
-    name: "Ethereum",
-    protocol: "ERC-20",
-    badge: "Standard",
-    fee: "~$3-$8 gas",
-    speed: "~3m confirmation",
-    accentColor: "slate",
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
-        <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#627EEA"/>
-        <path d="M16.498 4V12.87L23.995 16.22L16.498 4Z" fill="white" fillOpacity="0.6"/>
-        <path d="M16.498 4L9 16.22L16.498 12.87V4Z" fill="white"/>
-        <path d="M16.498 21.968V27.995L24 17.616L16.498 21.968Z" fill="white" fillOpacity="0.6"/>
-        <path d="M16.498 27.995V21.967L9 17.616L16.498 27.995Z" fill="white"/>
-        <path d="M16.498 20.573L23.995 16.22L16.498 12.872V20.573Z" fill="white" fillOpacity="0.2"/>
-        <path d="M9 16.22L16.498 20.573V12.872L9 16.22Z" fill="white" fillOpacity="0.6"/>
-      </svg>
-    ),
-  },
-];
+const networkCardsData = {
+  usdt: [
+    {
+      id: "bsc",
+      name: "BNB Smart Chain",
+      protocol: "BEP-20",
+      symbol: "USDT",
+      badge: "Lowest Fee",
+      fee: "~$0.10 fee",
+      speed: "~3s confirmation",
+      badgeColor: "emerald",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#F0B90B"/>
+          <path d="M16 6.5L20.25 10.75L16 15L11.75 10.75L16 6.5ZM21.75 12.25L26 16.5L21.75 20.75L17.5 16.5L21.75 12.25ZM10.25 12.25L14.5 16.5L10.25 20.75L6 16.5L10.25 12.25ZM16 18L20.25 22.25L16 26.5L11.75 22.25L16 18Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "tron",
+      name: "TRON",
+      protocol: "TRC-20",
+      symbol: "USDT",
+      badge: "Popular",
+      fee: "~$1.50 fee",
+      speed: "~1m confirmation",
+      badgeColor: "indigo",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#EB0029"/>
+          <path d="M24.7 9.8L7.6 6.5L14.4 25.5L24.7 9.8ZM19.5 11.2L11.5 9.7L15.3 14.8L19.5 11.2ZM15.3 17.5L12.5 21.6L10.3 11.3L15.3 17.5ZM17.1 14.8L21.7 11.5L16.2 21.5L17.1 14.8Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "ton",
+      name: "TON Network",
+      protocol: "Jetton",
+      symbol: "USDT",
+      badge: "Telegram Ready",
+      fee: "~$0.05 fee",
+      speed: "Instant confirmation",
+      badgeColor: "cyan",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#0088CC"/>
+          <path d="M22.5 9.5H9.5L8 12L16 24.5L24 12L22.5 9.5ZM11.2 11.5H20.8L16 19L11.2 11.5Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "ethereum",
+      name: "Ethereum",
+      protocol: "ERC-20",
+      symbol: "USDT",
+      badge: "High Security",
+      fee: "~$3-$8 gas",
+      speed: "~3m confirmation",
+      badgeColor: "slate",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#627EEA"/>
+          <path d="M16.498 4V12.87L23.995 16.22L16.498 4Z" fill="white" fillOpacity="0.6"/>
+          <path d="M16.498 4L9 16.22L16.498 12.87V4Z" fill="white"/>
+          <path d="M16.498 21.968V27.995L24 17.616L16.498 21.968Z" fill="white" fillOpacity="0.6"/>
+          <path d="M16.498 27.995V21.967L9 17.616L16.498 27.995Z" fill="white"/>
+          <path d="M16.498 20.573L23.995 16.22L16.498 12.872V20.573Z" fill="white" fillOpacity="0.2"/>
+          <path d="M9 16.22L16.498 20.573V12.872L9 16.22Z" fill="white" fillOpacity="0.6"/>
+        </svg>
+      ),
+    },
+  ],
+  native: [
+    {
+      id: "bsc",
+      name: "BNB Smart Chain",
+      protocol: "Native BNB",
+      symbol: "BNB",
+      badge: "Lowest Gas",
+      fee: "~$0.08 gas",
+      speed: "~3s confirmation",
+      badgeColor: "emerald",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#F0B90B"/>
+          <path d="M16 6.5L20.25 10.75L16 15L11.75 10.75L16 6.5ZM21.75 12.25L26 16.5L21.75 20.75L17.5 16.5L21.75 12.25ZM10.25 12.25L14.5 16.5L10.25 20.75L6 16.5L10.25 12.25ZM16 18L20.25 22.25L16 26.5L11.75 22.25L16 18Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "tron",
+      name: "TRON",
+      protocol: "Native TRX",
+      symbol: "TRX",
+      badge: "Low Energy",
+      fee: "~$0.02 gas",
+      speed: "~1m confirmation",
+      badgeColor: "indigo",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#EB0029"/>
+          <path d="M24.7 9.8L7.6 6.5L14.4 25.5L24.7 9.8ZM19.5 11.2L11.5 9.7L15.3 14.8L19.5 11.2ZM15.3 17.5L12.5 21.6L10.3 11.3L15.3 17.5ZM17.1 14.8L21.7 11.5L16.2 21.5L17.1 14.8Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "ton",
+      name: "The Open Network",
+      protocol: "Native GRAM",
+      symbol: "GRAM",
+      badge: "Telegram Ready",
+      fee: "~$0.02 gas",
+      speed: "Instant confirmation",
+      badgeColor: "cyan",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#0088CC"/>
+          <path d="M22.5 9.5H9.5L8 12L16 24.5L24 12L22.5 9.5ZM11.2 11.5H20.8L16 19L11.2 11.5Z" fill="white"/>
+        </svg>
+      ),
+    },
+    {
+      id: "ethereum",
+      name: "Ethereum",
+      protocol: "Native ETH",
+      symbol: "ETH",
+      badge: "High Security",
+      fee: "~$2-$5 gas",
+      speed: "~3m confirmation",
+      badgeColor: "slate",
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
+          <path d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32Z" fill="#627EEA"/>
+          <path d="M16.498 4V12.87L23.995 16.22L16.498 4Z" fill="white" fillOpacity="0.6"/>
+          <path d="M16.498 4L9 16.22L16.498 12.87V4Z" fill="white"/>
+          <path d="M16.498 21.968V27.995L24 17.616L16.498 21.968Z" fill="white" fillOpacity="0.6"/>
+          <path d="M16.498 27.995V21.967L9 17.616L16.498 27.995Z" fill="white"/>
+          <path d="M16.498 20.573L23.995 16.22L16.498 12.872V20.573Z" fill="white" fillOpacity="0.2"/>
+          <path d="M9 16.22L16.498 20.573V12.872L9 16.22Z" fill="white" fillOpacity="0.6"/>
+        </svg>
+      ),
+    },
+  ],
+};
 
 const format = (value) => new Intl.NumberFormat("en-US").format(value || 0);
 
@@ -164,6 +245,9 @@ export default function Subscribe() {
   const [plan, setPlan] = useState(null);
   const [premiumPlusPlan, setPremiumPlusPlan] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", organization_name: "", password: "", network: "bsc" });
+  const [paymentAsset, setPaymentAsset] = useState("usdt");
+  const [oracleData, setOracleData] = useState(null);
+  const [oracleLoading, setOracleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -196,7 +280,46 @@ export default function Subscribe() {
   const currentPriceBdt = isCustom
     ? preview?.payablePrice || 0
     : plan?.price_bdt || plan?.original_price_bdt || 0;
-  const estimatedUsdt = currentPriceBdt > 0 ? (currentPriceBdt / 119.5).toFixed(2) : "0.00";
+  
+  const bdtUsdtRate = Number(oracleData?.usdt_bdt_rate || 122);
+  const estimatedUsdt = currentPriceBdt > 0 ? (currentPriceBdt / bdtUsdtRate).toFixed(2) : "0.00";
+
+  const getCalculatedCrypto = (networkId, assetType = paymentAsset) => {
+    if (currentPriceBdt <= 0) return { amount: "0.00", symbol: "USDT", rate: null };
+    const totalUsd = currentPriceBdt / bdtUsdtRate;
+    
+    if (assetType === "usdt") {
+      return { amount: totalUsd.toFixed(2), symbol: "USDT", rate: null };
+    }
+    
+    const netRate = oracleData?.rates?.[networkId];
+    if (!netRate || !netRate.is_available || Number(netRate.usd_price) <= 0) {
+      return { amount: "--", symbol: netRate?.symbol || "COIN", rate: null, unavailable: true };
+    }
+    
+    const nativeCoins = totalUsd / Number(netRate.usd_price);
+    const decimals = netRate.decimals === 18 ? 4 : netRate.decimals === 9 ? 3 : 2;
+    return {
+      amount: nativeCoins.toFixed(decimals),
+      symbol: netRate.symbol,
+      usdPrice: Number(netRate.usd_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      rate: netRate,
+    };
+  };
+
+  const fetchRates = () => {
+    setOracleLoading(true);
+    getOracleRates()
+      .then((res) => setOracleData(res))
+      .catch(() => {})
+      .finally(() => setOracleLoading(false));
+  };
+
+  useEffect(() => {
+    fetchRates();
+    const interval = setInterval(fetchRates, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     getPlans()
@@ -482,8 +605,8 @@ export default function Subscribe() {
     setLoading(true);
     try {
       const invoice = isCustom
-        ? await createCustomInvoice({ ...submittedForm, limits: customLimits, idempotency_key: idempotencyKey })
-        : await createInvoice({ ...submittedForm, plan_slug: plan.slug, idempotency_key: idempotencyKey });
+        ? await createCustomInvoice({ ...submittedForm, payment_asset: paymentAsset, limits: customLimits, idempotency_key: idempotencyKey })
+        : await createInvoice({ ...submittedForm, payment_asset: paymentAsset, plan_slug: plan.slug, idempotency_key: idempotencyKey });
       navigate(`/payment/${invoice.id || "current"}`);
     } catch (err) {
       setError(apiError(err));
@@ -583,11 +706,22 @@ export default function Subscribe() {
                     </>
                   )}
 
-                  <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-                    <span className="flex items-center gap-1 text-slate-400">
-                      <Coins className="w-3.5 h-3.5 text-amber-400" /> Estimated USDT:
-                    </span>
-                    <span className="font-mono font-semibold text-indigo-300">~{estimatedUsdt} USDT</span>
+                  <div className="mt-2 pt-2 border-t border-white/5 space-y-1 text-xs text-slate-400">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <Coins className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Payable {paymentAsset === "native" ? getCalculatedCrypto(form.network, "native").symbol : "USDT"}:</span>
+                      </span>
+                      <span className="font-mono font-bold text-indigo-300">
+                        ~{getCalculatedCrypto(form.network, paymentAsset).amount} {getCalculatedCrypto(form.network, paymentAsset).symbol}
+                      </span>
+                    </div>
+                    {paymentAsset === "native" && getCalculatedCrypto(form.network, "native").usdPrice && (
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                        <span>1 {getCalculatedCrypto(form.network, "native").symbol} Rate:</span>
+                        <span className="text-slate-400">${getCalculatedCrypto(form.network, "native").usdPrice} USD</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -800,32 +934,87 @@ export default function Subscribe() {
                   </div>
                 </div>
 
-                {/* REDESIGNED CRYPTO NETWORK SELECTOR */}
+                {/* DUAL CRYPTO ASSET & NETWORK SELECTOR */}
                 {plan && !plan.is_free && (
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold text-slate-300">
-                        Select USDT Settlement Network
+                        Choose Payment Asset & Network
                       </label>
-                      <span className="text-[11px] text-slate-400 font-medium">USDT Only</span>
+                      <span className="text-[11px] text-slate-400 font-medium">Auto-calculated</span>
                     </div>
 
+                    {/* Asset Toggle Switcher */}
+                    <div className="grid grid-cols-2 p-1 bg-slate-950/90 rounded-2xl border border-white/10 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAsset("usdt")}
+                        className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          paymentAsset === "usdt"
+                            ? "bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-300 shadow-md shadow-emerald-500/10"
+                            : "text-slate-400 hover:text-slate-200 border border-transparent"
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                        <span>USDT (Stablecoin)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAsset("native")}
+                        className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          paymentAsset === "native"
+                            ? "bg-gradient-to-r from-indigo-500/20 to-violet-500/20 border border-indigo-500/40 text-indigo-300 shadow-md shadow-indigo-500/10"
+                            : "text-slate-400 hover:text-slate-200 border border-transparent"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span>Native Coins (BNB/TRX/GRAM/ETH)</span>
+                      </button>
+                    </div>
+
+                    {/* Live Oracle Price Ticker */}
+                    {paymentAsset === "native" && (
+                      <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between text-[11px] text-indigo-200 gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          <span className="font-semibold text-slate-300">Live Rates:</span>
+                          <span className="font-mono text-slate-300 text-[10.5px]">
+                            1 BNB ≈ ${Number(oracleData?.rates?.bsc?.usd_price || 692).toFixed(0)} • 1 TRX ≈ ${Number(oracleData?.rates?.tron?.usd_price || 0.33).toFixed(3)} • 1 GRAM ≈ ${Number(oracleData?.rates?.ton?.usd_price || 1.60).toFixed(2)} • 1 ETH ≈ ${Number(oracleData?.rates?.ethereum?.usd_price || 2438).toFixed(0)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={fetchRates}
+                          title="Refresh Live Rates"
+                          className="p-1 rounded-lg hover:bg-indigo-500/20 text-indigo-300 transition shrink-0"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${oracleLoading ? "animate-spin" : ""}`} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Network Cards Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {networks.map((net) => {
+                      {(networkCardsData[paymentAsset] || networkCardsData.usdt).map((net) => {
                         const isSelected = form.network === net.id;
+                        const crypto = getCalculatedCrypto(net.id, paymentAsset);
+                        const isUnavailable = crypto.unavailable;
                         return (
                           <label
                             key={net.id}
-                            className={`relative p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 ${
-                              isSelected
-                                ? "border-indigo-500 bg-indigo-500/10 shadow-[0_0_25px_-4px_rgba(99,102,241,0.35)]"
-                                : "border-slate-700/80 bg-slate-950/50 hover:border-slate-600"
+                            className={`relative p-3.5 rounded-2xl border transition-all duration-200 ${
+                              isUnavailable
+                                ? "opacity-50 border-slate-800 bg-slate-950/30 cursor-not-allowed"
+                                : isSelected
+                                ? "border-indigo-500 bg-indigo-500/10 shadow-[0_0_25px_-4px_rgba(99,102,241,0.35)] cursor-pointer"
+                                : "border-slate-700/80 bg-slate-950/50 hover:border-slate-600 cursor-pointer"
                             }`}
                           >
                             <input
                               type="radio"
                               name="network"
                               value={net.id}
+                              disabled={isUnavailable}
                               checked={isSelected}
                               onChange={update}
                               className="sr-only"
@@ -836,7 +1025,7 @@ export default function Subscribe() {
                                   {net.icon}
                                 </div>
                                 <div>
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <strong className="text-xs font-bold text-white block">{net.name}</strong>
                                     <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                                       {net.protocol}
@@ -847,11 +1036,11 @@ export default function Subscribe() {
                               </div>
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide shrink-0 ${
-                                  net.accentColor === "emerald"
+                                  net.badgeColor === "emerald"
                                     ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                                    : net.accentColor === "indigo"
+                                    : net.badgeColor === "indigo"
                                     ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                                    : net.accentColor === "cyan"
+                                    : net.badgeColor === "cyan"
                                     ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
                                     : "bg-slate-800 text-slate-400 border border-slate-700"
                                 }`}
@@ -860,11 +1049,18 @@ export default function Subscribe() {
                               </span>
                             </div>
 
-                            <div className="mt-2.5 pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-slate-400">
-                              <span className="flex items-center gap-1 font-mono text-emerald-400 font-semibold">
-                                <Zap className="w-3 h-3" /> {net.fee}
-                              </span>
-                              <span className="text-slate-400 text-[10px]">{net.speed}</span>
+                            <div className="mt-2.5 pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
+                              <div className="flex items-center gap-1 font-mono text-emerald-400 font-semibold">
+                                <Zap className="w-3 h-3" />
+                                <span>{net.fee}</span>
+                              </div>
+                              <div className="font-mono font-bold text-white text-xs">
+                                {isUnavailable ? (
+                                  <span className="text-amber-400 text-[10px]">Temporarily Locked</span>
+                                ) : (
+                                  <span>~{crypto.amount} {crypto.symbol}</span>
+                                )}
+                              </div>
                             </div>
                           </label>
                         );
@@ -893,7 +1089,7 @@ export default function Subscribe() {
                 {emailVerified && (
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Email verified successfully. You can now generate your USDT invoice.</span>
+                    <span>Email verified successfully. You can now generate your {paymentAsset === "native" ? "crypto" : "USDT"} invoice.</span>
                   </div>
                 )}
 
@@ -918,7 +1114,7 @@ export default function Subscribe() {
                       <span>&rarr; Dispatching OTP code…</span>
                     </>
                   ) : emailVerified ? (
-                    <span>&rarr; Create USDT settlement invoice</span>
+                    <span>&rarr; Create {paymentAsset === "native" ? "crypto" : "USDT"} settlement invoice</span>
                   ) : (
                     <span>&rarr; Send OTP to verify email</span>
                   )}

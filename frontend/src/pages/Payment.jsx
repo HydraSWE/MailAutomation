@@ -181,7 +181,11 @@ export default function Payment() {
           <div className="p-7 sm:p-9 border-b border-white/7 flex flex-col sm:flex-row gap-5 sm:items-center justify-between">
             <div>
               <p className="text-xs text-indigo-300 font-bold uppercase">
-                {customLimits?.quote_number ? `Enterprise Custom Invoice #${customLimits.quote_number}` : "USDT Invoice"}
+                {customLimits?.quote_number
+                  ? `Enterprise Custom Invoice #${customLimits.quote_number}`
+                  : invoice.payment_asset === "native"
+                  ? `${invoice.crypto_symbol || "Crypto"} Invoice`
+                  : "USDT Invoice"}
               </p>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <h1 className="text-3xl font-black">{invoice.plan.name}</h1>
@@ -225,8 +229,14 @@ export default function Payment() {
             {expired && <div className="border border-amber-400/25 bg-amber-400/5 p-4 rounded-md text-sm text-amber-100">Already sent payment? Paste the transaction below. Transfers made before expiry can still activate automatically; later transfers go to manual review.</div>}
             <div className="border border-indigo-400/20 bg-indigo-500/10 p-6 text-center rounded-md">
               <p className="text-sm text-indigo-200">Send exactly</p>
-              <p className="text-4xl font-black mt-2">{invoice.amount_usdt} <span className="text-lg">USDT</span></p>
-              <button onClick={() => copy(invoice.amount_usdt, "amount")} className="mt-3 text-xs text-slate-400 inline-flex gap-2">
+              <p className="text-4xl font-black mt-2">
+                {invoice.payment_asset === "native" ? invoice.crypto_amount : invoice.amount_usdt}{" "}
+                <span className="text-lg">{invoice.crypto_symbol || (invoice.payment_asset === "native" ? "COIN" : "USDT")}</span>
+              </p>
+              <button
+                onClick={() => copy(invoice.payment_asset === "native" ? String(invoice.crypto_amount) : String(invoice.amount_usdt), "amount")}
+                className="mt-3 text-xs text-slate-400 inline-flex gap-2"
+              >
                 <Copy className="w-3 h-3" />{copied === "amount" ? "Copied" : "Copy exact amount"}
               </button>
             </div>
@@ -240,7 +250,11 @@ export default function Payment() {
                 </button>
               </div>
             </div>
-            {!expired && <div className="border border-amber-400/20 bg-amber-400/5 p-4 rounded-md text-sm text-amber-100/80"><strong>Important:</strong> send USDT only on {labels[invoice.network]}.</div>}
+            {!expired && (
+              <div className="border border-amber-400/20 bg-amber-400/5 p-4 rounded-md text-sm text-amber-100/80">
+                <strong>Important:</strong> send {invoice.crypto_symbol || (invoice.payment_asset === "native" ? "native coin" : "USDT")} only on {labels[invoice.network]}.
+              </div>
+            )}
             <form onSubmit={verify}>
               <label className="text-xs font-bold text-slate-300">Transaction hash or explorer link</label>
               <textarea value={transaction} onChange={(e) => setTransaction(e.target.value)} required rows="3" placeholder="Paste the completed transaction hash or link" className="mt-2 w-full bg-slate-950 border border-slate-700 p-4 rounded-md text-sm outline-none focus:border-indigo-400" />
@@ -259,7 +273,7 @@ export default function Payment() {
             )}
             <div className="flex gap-3 text-xs text-slate-500">
               <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-              <p>Verification checks the official USDT contract, destination, amount, timestamp, confirmations, and one-time use.</p>
+              <p>Verification checks the blockchain transfer, destination address, amount, timestamp, confirmations, and one-time use.</p>
             </div>
             {!expired && <button onClick={cancel} disabled={Boolean(action)} className="w-full text-sm text-slate-500 hover:text-rose-300">Cancel invoice</button>}
           </div>

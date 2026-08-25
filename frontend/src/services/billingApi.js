@@ -37,6 +37,7 @@ publicClient.interceptors.request.use(async (config) => {
 });
 
 export const getPlans = () => publicClient.get("/billing/plans/").then((response) => response.data);
+export const getOracleRates = () => publicClient.get("/billing/oracle/rates/").then((response) => response.data);
 export const getPublicMonitorStats = () => publicClient.get("/billing/monitor/").then((response) => response.data);
 export const createFreeAccount = (payload) => publicClient.post("/billing/signup/free/", payload).then((response) => response.data);
 export const startCheckoutEmail = (email, turnstileToken = "") => publicClient.post("/billing/checkout/email/start/", { email, turnstile_token: turnstileToken }).then((response) => response.data);

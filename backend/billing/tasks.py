@@ -11,6 +11,7 @@ from .emails import (
     deliver_checkout_otp_email,
     deliver_email_change_otp,
     deliver_invoice_email,
+    deliver_lead_hunter_device_otp_email,
     deliver_lead_hunter_plus_welcome_email,
     deliver_manual_review_email,
     deliver_payment_confirmation_email,
@@ -61,6 +62,12 @@ def send_checkout_otp_email(email: str, code: str) -> str:
 @shared_task(**EMAIL_TASK_OPTIONS)
 def send_email_change_otp_email(email: str, code: str) -> str:
     deliver_email_change_otp(email, code)
+    return "sent"
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_lead_hunter_device_otp_email(email: str, code: str) -> str:
+    deliver_lead_hunter_device_otp_email(email, code)
     return "sent"
 
 
@@ -330,4 +337,3 @@ def send_custom_workspace_ready_email(quote_id: str) -> str:
         except Exception:
             pass
     return "sent"
-

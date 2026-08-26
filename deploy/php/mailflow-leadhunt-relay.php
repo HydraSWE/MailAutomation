@@ -353,15 +353,46 @@ function sendOtpRequiredResponse(int $registeredDeviceCount = 0): void {
 // Email Dispatch Helper
 // ----------------------------------------------------
 function sendOtpEmail(string $recipientEmail, string $otpCode, string $secret): bool {
-    $response = callDjangoMailFlowApi('/api/billing/lead-hunter/device-otp/send/', [
+    $payload = [
         'email' => strtolower($recipientEmail),
         'code' => $otpCode,
-    ], 'POST', $secret);
-    if (!$response || (isset($response['ok']) && $response['ok'] === false)) {
-        error_log('Lead Hunter OTP backend delivery failed for ' . $recipientEmail);
-        return false;
+    ];
+    $backendBaseUrl = defined('MAILFLOW_BACKEND_API_URL') && MAILFLOW_BACKEND_API_URL
+        ? rtrim(MAILFLOW_BACKEND_API_URL, '/')
+        : 'https://mailflow.annomous.com';
+    $urls = [
+        $backendBaseUrl . '/api/billing/lead-hunter/device-otp/send/',
+        'https://mailflow.annomous.com/api/billing/lead-hunter/device-otp/send/',
+    ];
+
+    foreach ($urls as $url) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-Mail-Flow-Secret: ' . $secret,
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+
+        $body = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($body !== false && $httpCode >= 200 && $httpCode < 300) {
+            $json = json_decode((string)$body, true);
+            if (is_array($json) && (!isset($json['ok']) || $json['ok'] !== false)) {
+                return true;
+            }
+        }
+        error_log('Lead Hunter OTP backend call failed: ' . $url . ' HTTP ' . $httpCode . ($curlError ? ' curl=' . $curlError : '') . ' body=' . substr((string)$body, 0, 500));
     }
-    return true;
+    return false;
 }
 
 // ----------------------------------------------------

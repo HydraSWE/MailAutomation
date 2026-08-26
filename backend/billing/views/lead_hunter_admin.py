@@ -2,7 +2,6 @@ import hmac
 import logging
 import requests
 from django.conf import settings
-from html import escape
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -32,41 +31,9 @@ class LeadHunterDeviceOtpEmailView(APIView):
         if not code.isdigit() or len(code) != 6:
             return Response({"ok": False, "detail": "A valid 6-digit code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        subject = f"Your Mail Flow Lead Hunter verification code: {code}"
-        body = (
-            f"Your Mail Flow Lead Hunter device verification code is {code}.\n\n"
-            "This code expires in 5 minutes. Enter it in the Lead Hunter extension to authorize this computer.\n\n"
-            "If you did not request this code, please change your Mail Flow password immediately."
-        )
-        custom_content = (
-            "<div style=\"background-color:#0B0F17;border:1px solid #1E293B;border-radius:10px;padding:22px;text-align:center;margin:20px 0;box-shadow:inset 0 2px 4px rgba(0,0,0,0.4);\">"
-            "<div style=\"font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;\">Lead Hunter Device Code</div>"
-            f"<div style=\"font-size:34px;font-weight:800;letter-spacing:8px;color:#38BDF8;font-family:monospace;text-shadow:0 0 16px rgba(56,189,248,0.25);\">{escape(code)}</div>"
-            "<div style=\"font-size:12px;color:#64748B;margin-top:8px;\">Expires in 5 minutes</div>"
-            "</div>"
-            "<div style=\"background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.22);border-radius:8px;padding:14px 16px;margin:18px 0;\">"
-            "<div style=\"font-size:12px;font-weight:700;color:#38BDF8;margin-bottom:5px;\">Device authorization requested</div>"
-            f"<div style=\"font-size:12.5px;color:#CBD5E1;line-height:1.55;\">Enter this code in the Mail Flow Lead Hunter extension to authorize this computer for <strong style=\"color:#F8FAFC;\">{escape(email)}</strong>.</div>"
-            "</div>"
-        )
-
         try:
-            from billing.emails import build_html_shell, send_system_email
-            html = build_html_shell(
-                "Lead Hunter Device Verification",
-                "Use the verification code below to authorize this computer for Mail Flow Lead Hunter.",
-                rows=[
-                    ("Account Email", email),
-                    ("Product", "Mail Flow Lead Hunter"),
-                    ("Status", "Device Verification"),
-                    ("Code Expiry", "5 minutes"),
-                ],
-                custom_content=custom_content,
-                badge="Lead Hunter Security",
-                footer_note="Never share this code. Mail Flow staff will never ask for your verification code.",
-                template_name="emails/billing/checkout_otp.html",
-            )
-            send_system_email(subject, body, email, html=html, sender="billing")
+            from billing.emails import deliver_lead_hunter_device_otp_email
+            deliver_lead_hunter_device_otp_email(email, code)
         except Exception as exc:
             logger.error("Failed to send Lead Hunter device OTP email: %s", exc)
             return Response({"ok": False, "detail": "Email delivery failed."}, status=status.HTTP_502_BAD_GATEWAY)

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle, ChevronRight, KeyRound, Loader2, Mail, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
 import { requestCustomQuoteOtp, submitCustomQuote, verifyCustomQuoteOtp } from "../../services/billingApi";
-
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 const format = (v) => new Intl.NumberFormat("en-US").format(v || 0);
 
@@ -15,9 +15,9 @@ export default function CustomQuoteModal({ isOpen, onClose, limits }) {
   const [otp, setOtp] = useState("");
   const [verificationId, setVerificationId] = useState("");
   const [submittedQuote, setSubmittedQuote] = useState(null);
-  const [accountExistsError, setAccountExistsError] = useState(null);
+  const [accountExistsError, setAccountExistsError] = useAutoDismiss(null, 10000);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileError, setTurnstileError] = useState(false);
   const [turnstileRenderKey, setTurnstileRenderKey] = useState(0);

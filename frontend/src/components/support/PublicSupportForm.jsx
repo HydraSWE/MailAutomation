@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, CheckCircle2, LifeBuoy, LogIn, Send, UserPlus } from "lucide-react";
 import CustomSelect from "../common/CustomSelect";
 import supportApi from "../../services/supportApi";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 const CATEGORY_OPTIONS = [
   { value: "deliverability", label: "Deliverability and SMTP" },
@@ -27,7 +28,46 @@ export default function PublicSupportForm({ defaultCategory = "deliverability", 
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileRenderKey, setTurnstileRenderKey] = useState(0);
+  const turnstileRef = useRef(null);
+
+  useEffect(() => {
+    const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+    if (!siteKey || !turnstileRef.current) return undefined;
+
+    let widgetId = null;
+    let cancelled = false;
+
+    const renderTurnstile = () => {
+      if (cancelled || !window.turnstile || !turnstileRef.current) return;
+      turnstileRef.current.innerHTML = "";
+      widgetId = window.turnstile.render(turnstileRef.current, {
+        sitekey: siteKey,
+        action: "support",
+        callback: (token) => setTurnstileToken(token),
+        "expired-callback": () => setTurnstileToken(""),
+        "error-callback": () => setTurnstileToken(""),
+      });
+    };
+
+    if (window.turnstile) {
+      renderTurnstile();
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      script.async = true;
+      script.defer = true;
+      script.onload = renderTurnstile;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+      if (widgetId !== null && window.turnstile?.remove) window.turnstile.remove(widgetId);
+    };
+  }, [turnstileRenderKey]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -44,6 +84,7 @@ export default function PublicSupportForm({ defaultCategory = "deliverability", 
         subject: finalSubject,
         message: message.trim(),
         priority,
+        turnstile_token: turnstileToken,
       });
 
       setSubmittedTicket({
@@ -54,8 +95,12 @@ export default function PublicSupportForm({ defaultCategory = "deliverability", 
       setEmail("");
       setSubject("");
       setMessage("");
+      setTurnstileToken("");
+      setTurnstileRenderKey((current) => current + 1);
     } catch (err) {
       setError(err.response?.data?.detail || "Unable to submit support ticket. Please try again or email support@annomous.com.");
+      setTurnstileToken("");
+      setTurnstileRenderKey((current) => current + 1);
     } finally {
       setLoading(false);
     }
@@ -232,6 +277,10 @@ export default function PublicSupportForm({ defaultCategory = "deliverability", 
                   className="mt-1.5 w-full resize-y rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-indigo-500"
                 />
               </div>
+
+              {import.meta.env.VITE_TURNSTILE_SITE_KEY ? (
+                <div key={turnstileRenderKey} ref={turnstileRef} className="min-h-[65px]" />
+              ) : null}
 
               <button
                 type="submit"

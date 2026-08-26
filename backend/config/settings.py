@@ -284,6 +284,7 @@ CHECKOUT_SESSION_COOKIE_SAMESITE = os.getenv(
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "")
 TURNSTILE_EXPECTED_HOSTNAME = os.getenv("TURNSTILE_EXPECTED_HOSTNAME", "")
 TURNSTILE_CHECKOUT_ACTION = os.getenv("TURNSTILE_CHECKOUT_ACTION", "checkout")
+TURNSTILE_SUPPORT_ACTION = os.getenv("TURNSTILE_SUPPORT_ACTION", "support")
 CONTENT_SECURITY_POLICY = os.getenv(
     "CONTENT_SECURITY_POLICY",
     "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://*.challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
@@ -291,7 +292,7 @@ CONTENT_SECURITY_POLICY = os.getenv(
 
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
 }
 

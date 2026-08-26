@@ -20,6 +20,7 @@ import {
 import { apiError, createFreeAccount, getPlans } from "../services/billingApi";
 import { setTokens, setUser } from "../utils/auth";
 import BrandLogo from "../components/BrandLogo";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -33,9 +34,9 @@ export default function Register() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [accountExistsError, setAccountExistsError] = useState(null);
+  const [accountExistsError, setAccountExistsError] = useAutoDismiss(null, 10000);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileError, setTurnstileError] = useState(false);
   const turnstileRef = useRef(null);

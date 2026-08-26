@@ -11,6 +11,7 @@ import {
 } from "../services/billingApi";
 import { getUser } from "../utils/auth";
 import CustomSelect from "../components/common/CustomSelect";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const paidNetworks = [
   ["bsc", "BNB Smart Chain (BEP20 USDT)"],
@@ -71,8 +72,8 @@ export default function AccountAdmin() {
   });
   const [quoteNotes, setQuoteNotes] = useState("");
   const [upgrading, setUpgrading] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [error, setError] = useAutoDismiss("");
+  const [successMessage, setSuccessMessage] = useAutoDismiss("");
 
   const load = () =>
     Promise.all([

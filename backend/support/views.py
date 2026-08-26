@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.conf import settings
 
 from common.plan_features import organization_mailbox_usage, organization_support_workspace_allowed
+from billing.services.turnstile import verify_turnstile
 from .models import SupportMailbox, SupportTicket
 from .serializers import (
     PublicSupportTicketSerializer,
@@ -35,6 +36,11 @@ class PublicSupportTicketView(APIView):
     def post(self, request):
         serializer = PublicSupportTicketSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        verify_turnstile(
+            serializer.validated_data.get("turnstile_token", ""),
+            request,
+            expected_action=getattr(settings, "TURNSTILE_SUPPORT_ACTION", "support"),
+        )
         ticket = serializer.save()
         return Response(
             {

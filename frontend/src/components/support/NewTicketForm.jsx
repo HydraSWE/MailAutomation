@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PlusCircle, Send } from "lucide-react";
 import CustomSelect from "../common/CustomSelect";
 import supportApi from "../../services/supportApi";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 const AUTH_CATEGORY_OPTIONS = [
   { value: "deliverability", label: "Deliverability and Warmup Schedule" },
@@ -23,7 +24,7 @@ export default function NewTicketForm({ user, onTicketCreated }) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
 
   async function handleSubmit(e) {
     e.preventDefault();

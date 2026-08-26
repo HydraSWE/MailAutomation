@@ -1,3 +1,4 @@
+import socket
 from django.test import TestCase
 from rest_framework.test import APIClient
 from unittest.mock import patch
@@ -18,7 +19,9 @@ class SMTPPlatformOwnerTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.owner)
 
-    def test_owner_creates_platform_smtp_account(self):
+    @patch("common.validators.socket.getaddrinfo")
+    def test_owner_creates_platform_smtp_account(self, mocked_getaddrinfo):
+        mocked_getaddrinfo.return_value = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
         response = self.client.post(
             "/api/smtp-accounts/",
             {
@@ -36,6 +39,24 @@ class SMTPPlatformOwnerTests(TestCase):
         self.assertEqual(response.status_code, 201)
         account = SMTPAccount.objects.get()
         self.assertIsNone(account.organization)
+
+    def test_rejects_localhost_smtp_target(self):
+        response = self.client.post(
+            "/api/smtp-accounts/",
+            {
+                "name": "Local SMTP",
+                "host": "localhost",
+                "port": 587,
+                "username": "platform@example.test",
+                "password": "secret-pass",
+                "encryption": "tls",
+                "from_email": "platform@example.test",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("host", response.data)
 
     def test_owner_only_sees_platform_smtp_accounts(self):
         organization = Organization.objects.create(name="Tenant")

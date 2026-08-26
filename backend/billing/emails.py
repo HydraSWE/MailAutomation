@@ -178,7 +178,7 @@ def build_html_shell(
             "value": value_text,
             "dark": index % 2 == 0,
             "last": index == len(rows_list) - 1,
-            "accent": any(token in value_text for token in ("USDT", "http", "Active", "Confirmed")),
+            "accent": any(token in value_text for token in ("USDT", "BNB", "TRX", "TON", "ETH", "GRAM", "http", "Active", "Confirmed")),
         })
     context: EmailShellContext = {
         "title": title,
@@ -193,6 +193,25 @@ def build_html_shell(
         "mark_url": MARK_URL,
     }
     return render_to_string(template_name, context)
+
+
+def _invoice_crypto_data(invoice: PaymentInvoice) -> tuple[str, str, str]:
+    """Returns (symbol, formatted_amount_with_symbol, raw_amount_str)"""
+    is_native = getattr(invoice, "payment_asset", PaymentInvoice.PaymentAsset.USDT) == PaymentInvoice.PaymentAsset.NATIVE
+    symbol = getattr(invoice, "crypto_symbol", "") or ("BNB" if is_native else "USDT")
+    if is_native:
+        amount_val = getattr(invoice, "crypto_amount", None)
+        if amount_val is None:
+            amount_val = Decimal("0")
+        amount_str = f"{amount_val} {symbol}"
+        raw_amount = str(amount_val)
+    else:
+        amount_val = getattr(invoice, "amount_usdt", None)
+        if amount_val is None:
+            amount_val = Decimal("0")
+        amount_str = f"{amount_val} USDT"
+        raw_amount = str(amount_val)
+    return symbol, amount_str, raw_amount
 
 
 
@@ -255,7 +274,8 @@ def deliver_email_change_otp(email: str, code: str) -> None:
 
 def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) -> None:
     link = invoice_link(invoice)
-    purpose = "Resume your USDT payment" if recovery else "Your USDT invoice is ready"
+    symbol, amount_str, _ = _invoice_crypto_data(invoice)
+    purpose = f"Resume your {symbol} payment" if recovery else f"Your {symbol} invoice is ready"
     network_label = dict(PaymentInvoice.Network.choices).get(invoice.network, invoice.network)
     rows = [
         ("Invoice ID", invoice.pk),
@@ -263,7 +283,7 @@ def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) ->
         ("Organization", invoice.organization_name),
         ("Plan", invoice.plan.name),
         ("Plan price", f"BDT {invoice.price_bdt:,}"),
-        ("USDT quote", f"{invoice.amount_usdt} USDT"),
+        (f"{symbol} quote", amount_str),
         ("Network", network_label),
         ("Receiving address", invoice.receiving_address),
         ("Quote expires", format_datetime(invoice.expires_at)),
@@ -280,7 +300,7 @@ def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) ->
         f"Organization: {invoice.organization_name}\n"
         f"Plan: {invoice.plan.name}\n"
         f"Plan price: BDT {invoice.price_bdt:,}\n"
-        f"Amount: {invoice.amount_usdt} USDT\n"
+        f"Amount: {amount_str}\n"
         f"Network: {network_label}\n"
         f"Receiving address: {invoice.receiving_address}\n"
         f"Quote expires: {format_datetime(invoice.expires_at)}\n\n"
@@ -300,7 +320,7 @@ def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) ->
             "<td style=\"width:28px;vertical-align:top;font-size:18px;line-height:1;\">⏳</td>"
             "<td style=\"vertical-align:top;padding-left:8px;\">"
             "<div style=\"font-size:13px;font-weight:700;color:#FBBF24;letter-spacing:0.01em;\">Payment Pending Confirmation</div>"
-            "<div style=\"font-size:12px;color:#94A3B8;margin-top:3px;line-height:1.4;\">Your USDT quote is still active. Use the button below to resume and complete your transaction directly on the blockchain.</div>"
+            f"<div style=\"font-size:12px;color:#94A3B8;margin-top:3px;line-height:1.4;\">Your {symbol} quote is still active. Use the button below to resume and complete your transaction directly on the blockchain.</div>"
             "</td>"
             "</tr>"
             "</table>"
@@ -308,8 +328,8 @@ def deliver_invoice_email(invoice: PaymentInvoice, *, recovery: bool = False) ->
             "</tr>"
             "</table>"
         )
-        intro_text = f"Hello {invoice.customer_name}, we noticed your USDT payment is still pending. You can resume and complete your payment below before the quote expires."
-        cta_label = "Resume USDT Payment"
+        intro_text = f"Hello {invoice.customer_name}, we noticed your {symbol} payment is still pending. You can resume and complete your payment below before the quote expires."
+        cta_label = f"Resume {symbol} Payment"
         badge_label = "Payment Pending"
         footer_note = "This secure payment recovery link grants direct access to complete your invoice. Do not forward this email."
     else:
@@ -353,10 +373,11 @@ def deliver_payment_confirmation_email(invoice: PaymentInvoice) -> None:
         else "See your dashboard"
     )
     login_url = f"{settings.FRONTEND_URL.rstrip('/')}/login"
+    symbol, amount_str, _ = _invoice_crypto_data(invoice)
 
     body = (
         f"Hello {invoice.customer_name},\n\nPayment confirmed. Your {invoice.plan.name} plan is active.\n"
-        f"Amount: {invoice.amount_usdt} USDT\nNetwork: {network_label}\n"
+        f"Amount: {amount_str}\nNetwork: {network_label}\n"
         f"Transaction: {explorer}{invoice.transaction_hash}\n"
         f"Next billing period starts after: {period_end_str}\n\n"
         f"Sign in: {login_url}"
@@ -364,7 +385,7 @@ def deliver_payment_confirmation_email(invoice: PaymentInvoice) -> None:
     rows = [
         ("Organization", invoice.organization_name),
         ("Plan", invoice.plan.name),
-        ("Amount", f"{invoice.amount_usdt} USDT"),
+        ("Amount", amount_str),
         ("Network", network_label),
         ("Transaction", f"{explorer}{invoice.transaction_hash}" if invoice.transaction_hash else "Confirmed"),
         ("Next billing date", period_end_str),
@@ -383,8 +404,9 @@ def deliver_payment_confirmation_email(invoice: PaymentInvoice) -> None:
 
 
 def deliver_manual_review_email(invoice: PaymentInvoice) -> None:
+    symbol, amount_str, _ = _invoice_crypto_data(invoice)
     body = (
-        f"Hello {invoice.customer_name},\n\nWe found your USDT transfer, but it arrived after the quote expired. "
+        f"Hello {invoice.customer_name},\n\nWe found your {symbol} transfer, but it arrived after the quote expired. "
         "The payment has been placed in manual review. We will contact you after it is resolved.\n\n"
         f"Invoice: {invoice.pk}\nTransaction: {invoice.transaction_hash or 'Recorded'}"
     )
@@ -392,12 +414,13 @@ def deliver_manual_review_email(invoice: PaymentInvoice) -> None:
         ("Invoice ID", invoice.pk),
         ("Organization", invoice.organization_name),
         ("Plan", invoice.plan.name),
+        ("Amount", amount_str),
         ("Transaction Hash", invoice.transaction_hash or "Recorded"),
         ("Status", "Under Manual Review"),
     ]
     html = build_html_shell(
         "Payment Under Review",
-        f"Hello {invoice.customer_name}, your USDT transfer arrived after the invoice expired and has been queued for manual review.",
+        f"Hello {invoice.customer_name}, your {symbol} transfer arrived after the invoice expired and has been queued for manual review.",
         rows,
         badge="Manual Review",
         footer_note="Our billing team is reviewing your transfer and will update your account shortly.",
@@ -643,14 +666,15 @@ def deliver_owner_payment_exception_email(invoice: Any, reason: str) -> None:
     owner_email = settings.MAIL_FLOW_GENERAL_SENDER_EMAIL or getattr(settings, "OWNER_ALERT_EMAIL", "admin@mailflow.io")
     subject = f"Payment Exception Flagged: {reason} on Invoice #{invoice.id}"
     review_url = f"{settings.FRONTEND_URL.rstrip('/')}/platform/custom-quotes"
+    symbol, amount_str, _ = _invoice_crypto_data(invoice)
     rows = [
         ("Invoice ID", str(invoice.id)),
-        ("Expected USDT", str(invoice.amount_usdt)),
+        ("Expected Amount", amount_str),
         ("Network", invoice.get_network_display()),
         ("Flagged Reason", reason),
         ("Transaction Hash", invoice.transaction_hash or "N/A"),
     ]
-    body = f"Payment Exception Alert: {reason} on invoice {invoice.id}.\nReview queue: {review_url}\n"
+    body = f"Payment Exception Alert: {reason} on invoice {invoice.id}.\nExpected: {amount_str}\nReview queue: {review_url}\n"
     html = build_html_shell(
         "Payment Exception Flagged",
         f"A blockchain payment requires manual review: {reason}",

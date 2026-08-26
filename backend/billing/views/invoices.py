@@ -201,12 +201,7 @@ class InvoiceDetailView(APIView):
         except (PaymentInvoice.DoesNotExist, ValueError):
             return Response({"detail": "Invoice not found."}, status=404)
         invoice = _expire_if_needed(invoice)
-        has_session = authorize_checkout_session(request, invoice)
-        response = _invoice_response(invoice)
-        if not has_session and not _is_org_admin_for_invoice(request, invoice):
-            session_token = create_checkout_session(invoice)
-            response = _set_checkout_cookie(response, session_token)
-        return response
+        return _invoice_response(invoice)
 
 
 class CurrentInvoiceView(APIView):

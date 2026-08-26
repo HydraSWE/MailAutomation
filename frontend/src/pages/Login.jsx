@@ -22,6 +22,7 @@ import { setTokens, setUser } from "../utils/auth";
 import BrandLogo from "../components/BrandLogo";
 import twoFactorApi from "../services/twoFactorApi";
 import { apiError } from "../utils/apiError";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const apiBase = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -36,7 +37,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
 
   // 2FA State
   const [twoFactorStep, setTwoFactorStep] = useState(false);

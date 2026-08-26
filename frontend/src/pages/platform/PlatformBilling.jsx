@@ -4,6 +4,7 @@ import api from "../../services/api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import CustomSelect from "../../components/common/CustomSelect";
 import { apiError } from "../../utils/apiError";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 const NETWORK_OPTIONS = [
   { value: "bsc", label: "BNB Smart Chain (BEP-20 USDT)" },
@@ -47,8 +48,8 @@ export default function PlatformBilling() {
   const [inspectNetwork, setInspectNetwork] = useState("bsc");
   const [inspectHash, setInspectHash] = useState("");
   const [inspectResult, setInspectResult] = useState(null);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
   const [confirmWalletSave, setConfirmWalletSave] = useState(false);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ from common.plan_features import (
     organization_mailbox_usage,
     organization_support_workspace_allowed,
 )
+from common.validators import validate_public_hostname
 from .models import SupportMailbox, SupportMessage, SupportTicket
 from .services import create_support_ticket
 
@@ -47,8 +48,10 @@ class PublicSupportTicketSerializer(serializers.Serializer):
     subject = serializers.CharField(max_length=180)
     message = serializers.CharField(max_length=10000)
     priority = serializers.ChoiceField(choices=SupportTicket.Priority.choices, required=False, default=SupportTicket.Priority.NORMAL)
+    turnstile_token = serializers.CharField(max_length=4096, required=False, allow_blank=True, write_only=True)
 
     def create(self, validated_data):
+        validated_data.pop("turnstile_token", None)
         request = self.context.get("request")
         user = getattr(request, "user", None)
         requester = user if getattr(user, "is_authenticated", False) else None
@@ -111,6 +114,10 @@ class SupportMailboxSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         user = request.user
+        imap_host = attrs.get("imap_host", getattr(self.instance, "imap_host", ""))
+        smtp_host = attrs.get("smtp_host", getattr(self.instance, "smtp_host", ""))
+        attrs["imap_host"] = validate_public_hostname(imap_host, field_name="imap_host")
+        attrs["smtp_host"] = validate_public_hostname(smtp_host, field_name="smtp_host")
         if user.role != "owner":
             organization = getattr(user, "organization", None)
             if organization is None:

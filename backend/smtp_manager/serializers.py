@@ -2,6 +2,7 @@ from rest_framework import serializers
 from common.tenancy import request_organization
 from common.models import Organization
 from common.plan_features import organization_mailbox_usage
+from common.validators import validate_public_hostname
 from django.db import transaction
 from .models import SMTPAccount
 
@@ -15,6 +16,8 @@ class SMTPAccountSerializer(serializers.ModelSerializer):
         read_only_fields = ("organization", "sent_today", "sent_date", "created_at", "updated_at")
 
     def validate(self, attrs):
+        host = attrs.get("host", getattr(self.instance, "host", ""))
+        attrs["host"] = validate_public_hostname(host, field_name="host")
         if self.instance is None:
             user = self.context["request"].user
             organization = None if user.role == "owner" else request_organization(self.context["request"])

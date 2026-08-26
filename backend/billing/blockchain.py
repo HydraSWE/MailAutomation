@@ -500,7 +500,7 @@ def _verify_evm_native(invoice, tx_hash):
         
     value_raw = int(tx.get("value", "0x0"), 16)
     required_raw = int(invoice.amount_raw or 0)
-    min_acceptable_raw = int(required_raw * 995 // 1000)
+    min_acceptable_raw = int(required_raw * 9995 // 10000)
     if value_raw < min_acceptable_raw:
         paid_coin = Decimal(value_raw) / Decimal(10**18)
         expected_coin = Decimal(required_raw) / Decimal(10**18)
@@ -546,7 +546,7 @@ def _verify_tron_native(invoice, tx_hash):
         raise VerificationError("This transaction predates the invoice.")
 
     required_sun = int(invoice.amount_raw or 0)
-    min_acceptable = int(required_sun * 995 // 1000)
+    min_acceptable = int(required_sun * 9995 // 10000)
     if amount_sun < min_acceptable:
         paid_trx = Decimal(amount_sun) / Decimal(10**6)
         expected_trx = Decimal(required_sun) / Decimal(10**6)
@@ -583,7 +583,7 @@ def _verify_ton_native(invoice, tx_hash):
     in_msg = matched.get("in_msg", {})
     amount_nano = int(in_msg.get("value", "0"))
     required_nano = int(invoice.amount_raw or 0)
-    min_acceptable = int(required_nano * 995 // 1000)
+    min_acceptable = int(required_nano * 9995 // 10000)
     if amount_nano < min_acceptable:
         paid_gram = Decimal(amount_nano) / Decimal(10**9)
         expected_gram = Decimal(required_nano) / Decimal(10**9)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, Copy, ExternalLink, Loader2, RefreshCw, ShieldCheck, Wallet, XCircle } from "lucide-react";
 import { apiError, cancelInvoice, exchangeInvoiceCode, getCurrentInvoice, getInvoice, recoverInvoice, replaceInvoice, verifyInvoice } from "../services/billingApi";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const labels = { bsc: "BNB Smart Chain", ethereum: "Ethereum", tron: "Tron", ton: "TON" };
 
@@ -16,8 +17,8 @@ export default function Payment() {
   const [transaction, setTransaction] = useState("");
   const [password, setPassword] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [copied, setCopied] = useState("");

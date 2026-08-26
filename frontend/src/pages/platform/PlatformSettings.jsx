@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Save, Settings } from "lucide-react";
 import settingsApi from "../../services/settingsApi";
 import { apiError } from "../../utils/apiError";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 export default function PlatformSettings() {
   const [appName, setAppName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
 
   useEffect(() => {
     settingsApi

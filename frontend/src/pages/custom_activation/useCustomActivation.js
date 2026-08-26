@@ -8,6 +8,7 @@ import {
   verifyCustomActivationOtp,
 } from "../../services/billingApi";
 import { setUser } from "../../utils/auth";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 export function useCustomActivation() {
   const { token } = useParams();
@@ -17,7 +18,7 @@ export function useCustomActivation() {
   const [step, setStep] = useState(1); // 1: Welcome & Request OTP, 2: Enter OTP, 3: Select Org & Set Password, 4: Success
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
 
   const [quoteInfo, setQuoteInfo] = useState(null);
   const [otp, setOtp] = useState("");

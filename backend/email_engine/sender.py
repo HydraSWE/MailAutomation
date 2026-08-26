@@ -12,10 +12,12 @@ from campaigns.models import CampaignLog
 from campaigns.tracking import append_unsubscribe_footer, rewrite_tracked_links, unsubscribe_url
 from common.models import Organization, SystemSetting
 from common.quotas import record_email_result, usage_snapshot, validate_organization_active
+from common.validators import validate_public_hostname
 from rest_framework.exceptions import ValidationError
 from .campaign_relay import send_campaign_via_relay
 
 def _connection(account):
+    validate_public_hostname(account.host, field_name="host")
     context = ssl.create_default_context()
 
     if account.encryption == "ssl" or account.port == 465:

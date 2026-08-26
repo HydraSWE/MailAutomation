@@ -260,6 +260,7 @@ def replace_invoice(invoice, password_hash):
     if _is_custom_invoice(invoice):
         data = {
             "network": invoice.network,
+            "payment_asset": getattr(invoice, "payment_asset", PaymentInvoice.PaymentAsset.USDT),
             "customer_name": invoice.customer_name,
             "customer_email": invoice.customer_email,
             "organization_name": invoice.organization_name,
@@ -286,6 +287,7 @@ def replace_invoice(invoice, password_hash):
     data = {
         "plan_slug": invoice.plan.slug,
         "network": invoice.network,
+        "payment_asset": getattr(invoice, "payment_asset", PaymentInvoice.PaymentAsset.USDT),
         "customer_name": invoice.customer_name,
         "customer_email": invoice.customer_email,
         "organization_name": invoice.organization_name,

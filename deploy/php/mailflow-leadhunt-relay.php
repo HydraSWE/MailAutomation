@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Mail Flow - Lead Hunter Central Management & Authentication Relay
  * Features:
- *  - 2-Device Policy per account with Email OTP Device Transfer (mailflow@annomous.com)
+ *  - 2-Device Policy per account with Email OTP Device Verification
  *  - Cryptographic HMAC-SHA256 JWT Token Generation & Verification
  *  - Lead Push & Recipient List Central Management
  *  - Admin License Provisioning & Quota Controller
@@ -66,7 +66,14 @@ $dbUser = defined('MAILFLOW_LEADHUNT_DB_USER') ? MAILFLOW_LEADHUNT_DB_USER : (de
 $dbPass = defined('MAILFLOW_LEADHUNT_DB_PASS') ? MAILFLOW_LEADHUNT_DB_PASS : (defined('MAILFLOW_DB_PASS') ? MAILFLOW_DB_PASS : '');
 $relaySecret = defined('MAILFLOW_LEADHUNT_RELAY_SECRET') 
     ? MAILFLOW_LEADHUNT_RELAY_SECRET 
-    : (defined('MAILFLOW_RELAY_SECRET') ? MAILFLOW_RELAY_SECRET : (defined('MAILFLOW_OTP_RELAY_SECRET') ? MAILFLOW_OTP_RELAY_SECRET : 'MFLH_DEFAULT_SECRET_KEY_2026'));
+    : (defined('MAILFLOW_RELAY_SECRET') ? MAILFLOW_RELAY_SECRET : (defined('MAILFLOW_OTP_RELAY_SECRET') ? MAILFLOW_OTP_RELAY_SECRET : ''));
+if (!is_string($relaySecret) || strlen($relaySecret) < 32) {
+    sendJson([
+        'ok' => false,
+        'status' => 'configuration_error',
+        'error' => 'Lead Hunter relay is not configured.'
+    ], 500);
+}
 
 // Connect to MySQL Database & Ensure Tables Exist
 try {
@@ -115,7 +122,7 @@ try {
             `id` INT AUTO_INCREMENT PRIMARY KEY,
             `email` VARCHAR(255) NOT NULL,
             `device_id` VARCHAR(128) NOT NULL,
-            `otp_code` VARCHAR(10) NOT NULL,
+            `otp_code` VARCHAR(128) NOT NULL,
             `attempts` INT DEFAULT 0,
             `expires_at` TIMESTAMP NOT NULL,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -157,12 +164,14 @@ try {
     // Dynamic schema column integrity migrations
     try { $pdo->exec("ALTER TABLE `licenses` ADD COLUMN `max_recipients` INT DEFAULT 10000"); } catch (\Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `licenses` ADD COLUMN `max_batch_limit` INT DEFAULT 500"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE `license_otps` MODIFY COLUMN `otp_code` VARCHAR(128) NOT NULL"); } catch (\Throwable $e) {}
 
 } catch (\Throwable $e) {
+    error_log('MailFlow LeadHunter DB connection failed: ' . $e->getMessage());
     sendJson([
         'ok' => false,
         'status' => 'db_error',
-        'error' => 'Database Connection Error: ' . $e->getMessage()
+        'error' => 'Lead Hunter service is temporarily unavailable.'
     ], 200);
 }
 
@@ -300,48 +309,59 @@ function evictOldestDeviceAndAdd(PDO $pdo, int $licenseId, string $email, string
     registerDeviceForLicense($pdo, $licenseId, $email, $newDeviceId);
 }
 
-// ----------------------------------------------------
-// Email Dispatch Helper (mailflow@annomous.com)
-// ----------------------------------------------------
-function sendOtpEmail(string $recipientEmail, string $otpCode): bool {
-    $subject = "Your Mail Flow Device Authorization Code: " . $otpCode;
-    
-    $htmlBody = "
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset='UTF-8'></head>
-    <body style='font-family: Arial, sans-serif; background: #0F172A; color: #F8FAFC; padding: 24px;'>
-        <div style='max-width: 480px; margin: 0 auto; background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 24px;'>
-            <div style='text-align: center; margin-bottom: 20px;'>
-                <h2 style='color: #818CF8; margin: 0;'>Mail Flow - Lead Hunter</h2>
-                <p style='color: #94A3B8; font-size: 13px; margin-top: 4px;'>Device Transfer & Authorization</p>
-            </div>
-            <p style='font-size: 14px; color: #CBD5E1; line-height: 1.5;'>
-                We received a request to link a new computer to your Mail Flow account (<strong>" . htmlspecialchars($recipientEmail) . "</strong>).
-            </p>
-            <div style='background: #0F172A; border: 1px solid #475569; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0;'>
-                <div style='font-size: 11px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px;'>6-Digit Verification Code</div>
-                <div style='font-size: 32px; font-weight: 800; color: #38BDF8; letter-spacing: 6px; margin-top: 6px;'>" . $otpCode . "</div>
-            </div>
-            <p style='font-size: 12px; color: #94A3B8; line-height: 1.4;'>
-                ⏰ <strong>This code will expire in 5 minutes.</strong> Entering this code will authorize this device and replace an older slot (up to 2 active devices allowed).
-            </p>
-            <hr style='border: 0; border-top: 1px solid #334155; margin: 20px 0;'>
-            <p style='font-size: 11px; color: #64748B; text-align: center; margin: 0;'>
-                If you did not initiate this request, please change your Mail Flow account password immediately.
-            </p>
-        </div>
-    </body>
-    </html>
-    ";
+function createOtpDigest(string $email, string $deviceId, string $otpCode, string $secret): string {
+    return hash_hmac('sha256', strtolower($email) . '|' . $deviceId . '|' . $otpCode, $secret);
+}
 
-    $headers  = "MIME-Version: 1.0\r\n";
-    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: Mail Flow <mailflow@annomous.com>\r\n";
-    $headers .= "Reply-To: support@annomous.com\r\n";
-    $headers .= "X-Mailer: PHP/" . phpversion();
+function isRegisteredDevice(PDO $pdo, int $licenseId, string $deviceId): bool {
+    if ($deviceId === '') {
+        return false;
+    }
+    $stmt = $pdo->prepare("SELECT 1 FROM `license_devices` WHERE `license_id` = :lid AND `device_id` = :dev LIMIT 1");
+    $stmt->execute([':lid' => $licenseId, ':dev' => $deviceId]);
+    return (bool)$stmt->fetchColumn();
+}
 
-    return @mail($recipientEmail, $subject, $htmlBody, $headers);
+function verifyBearerContext(string $token, string $expectedEmail, string $expectedDevice, string $secret): ?array {
+    if ($token === '' || $expectedDevice === '') {
+        return null;
+    }
+    $payload = verifyJwtToken($token, $secret);
+    if (!$payload || empty($payload['sub']) || empty($payload['device_id'])) {
+        return null;
+    }
+    if (!hash_equals(strtolower($expectedEmail), strtolower((string)$payload['sub']))) {
+        return null;
+    }
+    if (!hash_equals($expectedDevice, (string)$payload['device_id'])) {
+        return null;
+    }
+    return $payload;
+}
+
+function sendOtpRequiredResponse(int $registeredDeviceCount = 0): void {
+    sendJson([
+        'ok' => false,
+        'status' => 'otp_required',
+        'otp_required' => true,
+        'message' => 'Device verification required. Please enter the code sent to your Mail Flow email.',
+        'registered_devices_count' => $registeredDeviceCount
+    ], 403);
+}
+
+// ----------------------------------------------------
+// Email Dispatch Helper
+// ----------------------------------------------------
+function sendOtpEmail(string $recipientEmail, string $otpCode, string $secret): bool {
+    $response = callDjangoMailFlowApi('/api/billing/lead-hunter/device-otp/send/', [
+        'email' => strtolower($recipientEmail),
+        'code' => $otpCode,
+    ], 'POST', $secret);
+    if (!$response || (isset($response['ok']) && $response['ok'] === false)) {
+        error_log('Lead Hunter OTP backend delivery failed for ' . $recipientEmail);
+        return false;
+    }
+    return true;
 }
 
 // ----------------------------------------------------
@@ -352,15 +372,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $deviceId = trim($_GET['deviceId'] ?? $_GET['device_id'] ?? '');
 
     if (empty($query)) {
-        sendJson(['ok' => false, 'status' => 'not_found', 'error' => 'Email or license key required.'], 400);
+        sendJson(['ok' => false, 'status' => 'not_found', 'error' => 'License key required.'], 400);
+    }
+    if (filter_var($query, FILTER_VALIDATE_EMAIL)) {
+        sendJson(['ok' => false, 'status' => 'otp_required', 'error' => 'Email-only license lookup requires OTP verification.'], 403);
+    }
+    if (empty($deviceId)) {
+        sendJson(['ok' => false, 'status' => 'device_required', 'error' => 'Device identifier is required.'], 400);
     }
 
     $stmt = $pdo->prepare("
         SELECT * FROM `licenses` 
-        WHERE LOWER(`email`) = :q1 OR LOWER(`license_key`) = :q2 
+        WHERE LOWER(`license_key`) = :q2 
         ORDER BY `id` DESC LIMIT 1
     ");
-    $stmt->execute([':q1' => strtolower($query), ':q2' => strtolower($query)]);
+    $stmt->execute([':q2' => strtolower($query)]);
     $lic = $stmt->fetch();
 
     if ($lic && str_starts_with((string)($lic['license_key'] ?? ''), 'MF-LH-')) {
@@ -393,15 +419,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         if (in_array($deviceId, $devList)) {
             registerDeviceForLicense($pdo, (int)$lic['id'], $lic['email'], $deviceId);
-        } elseif (count($activeDevs) < MAX_DEVICE_LIMIT) {
-            registerDeviceForLicense($pdo, (int)$lic['id'], $lic['email'], $deviceId);
         } else {
-            sendJson([
-                'ok' => false,
-                'status' => 'device_locked',
-                'device_limit_reached' => true,
-                'error' => 'Device limit reached (2 active computers). Please verify via OTP to transfer access.'
-            ], 403);
+            sendOtpRequiredResponse(count($activeDevs));
         }
     }
 
@@ -461,6 +480,9 @@ if ($action === 'activate_license') {
 
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         sendJson(['ok' => false, 'status' => 'error', 'error' => 'Valid account email is required.'], 400);
+    }
+    if (empty($deviceId)) {
+        sendJson(['ok' => false, 'status' => 'device_required', 'error' => 'Device identifier is required.'], 400);
     }
 
     $stmt = $pdo->prepare("SELECT * FROM `licenses` WHERE LOWER(`email`) = :email ORDER BY `id` DESC LIMIT 1");
@@ -530,54 +552,44 @@ if ($action === 'activate_license') {
 
     $licId = (int)$lic['id'];
     $activeDevs = getActiveDevicesForLicense($pdo, $licId);
-    $devList = array_column($activeDevs, 'device_id');
 
-    // If device is already registered or slots available (< 2)
-    if (empty($deviceId) || in_array($deviceId, $devList) || count($activeDevs) < MAX_DEVICE_LIMIT) {
-        if (!empty($deviceId)) {
-            registerDeviceForLicense($pdo, $licId, $email, $deviceId);
-        }
-
-        $currentRecipients = getLiveRecipientCount($pdo, $email, $relaySecret);
-
-        $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
-        $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
-        $maxBatch = (int)($lic['max_batch_limit'] ?? $planLimits['max_batch_limit']);
-        $avail = max(0, $maxRec - $currentRecipients);
-
-        $quota = [
-            'plan_name' => $lic['plan'] ?? 'Pro',
-            'plan_status' => 'active',
-            'max_recipients' => $maxRec,
-            'current_recipients' => $currentRecipients,
-            'available_slots' => $avail,
-            'max_batch_limit' => min($maxBatch, max(20, $avail)),
-        ];
-
-        $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret, $lic['expires_at'] ?? null);
-
-        sendJson([
-            'ok' => true,
-            'status' => 'active',
-            'token' => $token,
-            'email' => $email,
-            'plan' => $lic['plan'] ?? 'Pro',
-            'expireDate' => $lic['expires_at'],
-            'quota' => $quota
-        ]);
+    $trustedPayload = verifyBearerContext($bearerToken, $email, $deviceId, $relaySecret);
+    if (!$trustedPayload || !isRegisteredDevice($pdo, $licId, $deviceId)) {
+        sendOtpRequiredResponse(count($activeDevs));
     }
 
-    // 2-Device Limit reached -> Prompt OTP
+    registerDeviceForLicense($pdo, $licId, $email, $deviceId);
+    $currentRecipients = getLiveRecipientCount($pdo, $email, $relaySecret);
+
+    $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
+    $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
+    $maxBatch = (int)($lic['max_batch_limit'] ?? $planLimits['max_batch_limit']);
+    $avail = max(0, $maxRec - $currentRecipients);
+
+    $quota = [
+        'plan_name' => $lic['plan'] ?? 'Pro',
+        'plan_status' => 'active',
+        'max_recipients' => $maxRec,
+        'current_recipients' => $currentRecipients,
+        'available_slots' => $avail,
+        'max_batch_limit' => min($maxBatch, max(20, $avail)),
+    ];
+
+    $token = createJwtToken($email, $deviceId, $lic['plan'] ?? 'Pro', $quota, $relaySecret, $lic['expires_at'] ?? null);
+
     sendJson([
-        'ok' => false,
-        'status' => 'device_limit_reached',
-        'message' => 'Account is already active on 2 other devices. OTP verification required to transfer access.',
-        'registered_devices_count' => count($activeDevs)
+        'ok' => true,
+        'status' => 'active',
+        'token' => $token,
+        'email' => $email,
+        'plan' => $lic['plan'] ?? 'Pro',
+        'expireDate' => $lic['expires_at'],
+        'quota' => $quota
     ]);
 }
 
 // ----------------------------------------------------
-// ACTION: request_device_otp (Send code from mailflow@annomous.com)
+// ACTION: request_device_otp
 // ----------------------------------------------------
 if ($action === 'request_device_otp') {
     $email = strtolower(trim($input['email'] ?? ''));
@@ -586,27 +598,46 @@ if ($action === 'request_device_otp') {
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         sendJson(['ok' => false, 'error' => 'Valid account email required.'], 400);
     }
+    if (empty($deviceId)) {
+        sendJson(['ok' => false, 'status' => 'device_required', 'error' => 'Device identifier is required.'], 400);
+    }
+
+    $licStmt = $pdo->prepare("SELECT * FROM `licenses` WHERE LOWER(`email`) = :email ORDER BY `id` DESC LIMIT 1");
+    $licStmt->execute([':email' => $email]);
+    $lic = $licStmt->fetch();
+    if (!$lic || $lic['status'] !== 'active' || $lic['expires_at'] < date('Y-m-d')) {
+        sendJson(['ok' => false, 'status' => 'expired', 'error' => 'Active subscription required before device verification.'], 403);
+    }
 
     // Rate limit: 1 request per 45 seconds
-    $chkStmt = $pdo->prepare("SELECT `created_at` FROM `license_otps` WHERE `email` = :email ORDER BY `id` DESC LIMIT 1");
-    $chkStmt->execute([':email' => $email]);
+    $chkStmt = $pdo->prepare("SELECT `created_at` FROM `license_otps` WHERE `email` = :email AND `device_id` = :dev ORDER BY `id` DESC LIMIT 1");
+    $chkStmt->execute([':email' => $email, ':dev' => $deviceId]);
     $lastOtp = $chkStmt->fetch();
     if ($lastOtp && (time() - strtotime($lastOtp['created_at'])) < 45) {
         sendJson(['ok' => true, 'message' => "Verification code already sent. Please check your inbox."]);
     }
 
     $otp = strval(random_int(100000, 999999));
+    $otpDigest = createOtpDigest($email, $deviceId, $otp, $relaySecret);
     $expiresAt = date('Y-m-d H:i:s', time() + 300); // 5 minutes TTL
 
     $insOtp = $pdo->prepare("INSERT INTO `license_otps` (`email`, `device_id`, `otp_code`, `expires_at`) VALUES (:email, :dev, :otp, :exp)");
-    $insOtp->execute([':email' => $email, ':dev' => $deviceId, ':otp' => $otp, ':exp' => $expiresAt]);
+    $insOtp->execute([':email' => $email, ':dev' => $deviceId, ':otp' => $otpDigest, ':exp' => $expiresAt]);
 
-    sendOtpEmail($email, $otp);
+    if (!sendOtpEmail($email, $otp, $relaySecret)) {
+        $delOtp = $pdo->prepare("DELETE FROM `license_otps` WHERE `email` = :email AND `device_id` = :dev AND `otp_code` = :otp");
+        $delOtp->execute([':email' => $email, ':dev' => $deviceId, ':otp' => $otpDigest]);
+        sendJson([
+            'ok' => false,
+            'status' => 'email_delivery_failed',
+            'error' => 'Verification email could not be sent. Please try again or contact support.'
+        ], 502);
+    }
 
     sendJson([
         'ok' => true,
         'status' => 'otp_sent',
-        'message' => "Verification code dispatched from mailflow@annomous.com to {$email}"
+        'message' => "Verification code sent from Mail Flow Billing to {$email}"
     ]);
 }
 
@@ -618,16 +649,16 @@ if ($action === 'verify_device_otp') {
     $deviceId = trim($input['deviceId'] ?? $input['device_id'] ?? '');
     $otp = trim($input['otp'] ?? '');
 
-    if (empty($email) || empty($otp)) {
-        sendJson(['ok' => false, 'status' => 'error', 'error' => 'Email and 6-digit code are required.'], 400);
+    if (empty($email) || empty($deviceId) || empty($otp)) {
+        sendJson(['ok' => false, 'status' => 'error', 'error' => 'Email, device, and 6-digit code are required.'], 400);
     }
 
     $stmt = $pdo->prepare("
         SELECT * FROM `license_otps` 
-        WHERE `email` = :email AND `expires_at` > NOW()
+        WHERE `email` = :email AND `device_id` = :dev AND `expires_at` > NOW()
         ORDER BY `id` DESC LIMIT 1
     ");
-    $stmt->execute([':email' => $email]);
+    $stmt->execute([':email' => $email, ':dev' => $deviceId]);
     $otpRecord = $stmt->fetch();
 
     if (!$otpRecord) {
@@ -641,7 +672,8 @@ if ($action === 'verify_device_otp') {
         sendJson(['ok' => false, 'status' => 'too_many_attempts', 'error' => 'Too many failed attempts. Verification code has been revoked. Please request a new code.'], 429);
     }
 
-    if (trim($otpRecord['otp_code']) !== $otp) {
+    $expectedOtpDigest = createOtpDigest($email, $deviceId, $otp, $relaySecret);
+    if (!hash_equals(trim((string)$otpRecord['otp_code']), $expectedOtpDigest)) {
         $attempts++;
         if ($attempts >= 5) {
             $del = $pdo->prepare("DELETE FROM `license_otps` WHERE `id` = :id");
@@ -667,9 +699,16 @@ if ($action === 'verify_device_otp') {
     if (!$lic) {
         sendJson(['ok' => false, 'error' => 'Subscription record not found.'], 404);
     }
+    if ($lic['status'] !== 'active' || $lic['expires_at'] < date('Y-m-d')) {
+        sendJson(['ok' => false, 'status' => 'expired', 'error' => 'Active subscription required.'], 403);
+    }
 
     $licId = (int)$lic['id'];
-    evictOldestDeviceAndAdd($pdo, $licId, $email, $deviceId);
+    if (isRegisteredDevice($pdo, $licId, $deviceId)) {
+        registerDeviceForLicense($pdo, $licId, $email, $deviceId);
+    } else {
+        evictOldestDeviceAndAdd($pdo, $licId, $email, $deviceId);
+    }
 
     $currentRecipients = getLiveRecipientCount($pdo, $email, $relaySecret);
 
@@ -705,14 +744,17 @@ if ($action === 'verify_device_otp') {
 // ----------------------------------------------------
 if ($action === 'heartbeat') {
     $token = !empty($bearerToken) ? $bearerToken : trim($input['token'] ?? '');
-    $email = strtolower(trim($input['email'] ?? ''));
     $deviceId = trim($input['deviceId'] ?? $input['device_id'] ?? '');
 
     $payload = !empty($token) ? verifyJwtToken($token, $relaySecret) : null;
-    $verifiedEmail = $payload['sub'] ?? $email;
+    $verifiedEmail = $payload['sub'] ?? '';
+    $verifiedDevice = $payload['device_id'] ?? '';
 
-    if (empty($verifiedEmail)) {
+    if (empty($verifiedEmail) || !filter_var($verifiedEmail, FILTER_VALIDATE_EMAIL) || empty($verifiedDevice)) {
         sendJson(['ok' => false, 'status' => 'unauthorized'], 401);
+    }
+    if ($deviceId !== '' && !hash_equals((string)$verifiedDevice, $deviceId)) {
+        sendJson(['ok' => false, 'status' => 'device_locked', 'message' => 'Device token mismatch. Please sign in again.'], 403);
     }
 
     $stmt = $pdo->prepare("SELECT * FROM `licenses` WHERE LOWER(`email`) = :email ORDER BY `id` DESC LIMIT 1");
@@ -722,6 +764,10 @@ if ($action === 'heartbeat') {
     if (!$lic || $lic['status'] !== 'active' || $lic['expires_at'] < date('Y-m-d')) {
         sendJson(['ok' => false, 'status' => 'expired', 'message' => 'Subscription inactive or expired.']);
     }
+    if (!isRegisteredDevice($pdo, (int)$lic['id'], (string)$verifiedDevice)) {
+        sendJson(['ok' => false, 'status' => 'device_locked', 'message' => 'Device unauthorized. Please verify via OTP.'], 403);
+    }
+    registerDeviceForLicense($pdo, (int)$lic['id'], $verifiedEmail, (string)$verifiedDevice);
 
     $currentTotal = getLiveRecipientCount($pdo, $verifiedEmail, $relaySecret);
 
@@ -797,19 +843,19 @@ function callDjangoMailFlowApi(string $path, array $data = [], string $method = 
 // Handle Client Lead Push & Lists Actions
 // ----------------------------------------------------
 if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license', 'get_scraper_rules'])) {
-    $clientEmail = strtolower(trim($input['email'] ?? ''));
     $clientDevice = trim($input['deviceId'] ?? $input['device_id'] ?? '');
+    $jwtPayload = !empty($bearerToken) ? verifyJwtToken($bearerToken, $relaySecret) : null;
 
-    // Validate JWT Token if provided
-    if (!empty($bearerToken)) {
-        $jwtPayload = verifyJwtToken($bearerToken, $relaySecret);
-        if ($jwtPayload && !empty($jwtPayload['sub'])) {
-            $clientEmail = strtolower($jwtPayload['sub']);
-        }
+    if (!$jwtPayload || empty($jwtPayload['sub']) || empty($jwtPayload['device_id'])) {
+        sendJson(['ok' => false, 'status' => 'unauthorized', 'error' => 'Valid Lead Hunter session token required.'], 401);
     }
-
+    $clientEmail = strtolower((string)$jwtPayload['sub']);
+    $tokenDevice = (string)$jwtPayload['device_id'];
     if (empty($clientEmail) || !filter_var($clientEmail, FILTER_VALIDATE_EMAIL)) {
-        sendJson(['ok' => false, 'error' => 'Valid account email required.'], 403);
+        sendJson(['ok' => false, 'status' => 'unauthorized', 'error' => 'Valid Lead Hunter session token required.'], 401);
+    }
+    if ($clientDevice !== '' && !hash_equals($tokenDevice, $clientDevice)) {
+        sendJson(['ok' => false, 'status' => 'device_locked', 'error' => 'Device token mismatch. Please verify via OTP.'], 403);
     }
 
     $stmt = $pdo->prepare("SELECT * FROM `licenses` WHERE LOWER(`email`) = :email ORDER BY `id` DESC LIMIT 1");
@@ -819,21 +865,37 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license', 'g
     if (!$lic || $lic['status'] !== 'active' || $lic['expires_at'] < date('Y-m-d')) {
         sendJson(['ok' => false, 'status' => 'expired', 'error' => 'Active subscription required.'], 403);
     }
+    if (!isRegisteredDevice($pdo, (int)$lic['id'], $tokenDevice)) {
+        sendJson(['ok' => false, 'status' => 'device_locked', 'error' => 'Device unauthorized. Please verify via OTP.'], 403);
+    }
+    registerDeviceForLicense($pdo, (int)$lic['id'], $clientEmail, $tokenDevice);
+
+    if ($action === 'verify_license') {
+        $currentRecipients = getLiveRecipientCount($pdo, $clientEmail, $relaySecret);
+        $planLimits = getPlanLimits($lic['plan'] ?? 'Pro', $lic);
+        $maxRec = (int)($lic['max_recipients'] ?? $planLimits['max_recipients']);
+        $maxBatch = (int)($lic['max_batch_limit'] ?? $planLimits['max_batch_limit']);
+        $avail = max(0, $maxRec - $currentRecipients);
+
+        sendJson([
+            'ok' => true,
+            'status' => 'active',
+            'email' => $clientEmail,
+            'plan' => $lic['plan'] ?? 'Pro',
+            'expireDate' => $lic['expires_at'],
+            'quota' => [
+                'plan_name' => $lic['plan'] ?? 'Pro',
+                'plan_status' => 'active',
+                'max_recipients' => $maxRec,
+                'current_recipients' => $currentRecipients,
+                'available_slots' => $avail,
+                'max_batch_limit' => min($maxBatch, max(20, $avail)),
+            ]
+        ]);
+    }
 
     // Dynamic Server-Gated Extraction Rules
     if ($action === 'get_scraper_rules') {
-        if (!empty($clientDevice)) {
-            $activeDevs = getActiveDevicesForLicense($pdo, (int)$lic['id']);
-            $devList = array_column($activeDevs, 'device_id');
-            if (!empty($devList) && !in_array($clientDevice, $devList) && count($activeDevs) >= MAX_DEVICE_LIMIT) {
-                sendJson([
-                    'ok' => false,
-                    'status' => 'device_locked',
-                    'error' => 'Device unauthorized. Please verify via OTP on Mail Flow.'
-                ], 403);
-            }
-        }
-
         $rules = [
             'version' => '1.0.0',
             'timestamp' => time(),
@@ -992,6 +1054,11 @@ if (in_array($action, ['push_leads', 'get_recipient_lists', 'verify_license', 'g
         if ($djangoRes && isset($djangoRes['ok']) && $djangoRes['ok'] !== false) {
             sendJson($djangoRes);
         }
+        sendJson([
+            'ok' => false,
+            'status' => 'django_sync_failed',
+            'error' => 'Lead import could not be verified by Mail Flow. Please try again later.'
+        ], 502);
 
         // 2. Direct Sync into Django Database Tables if present in MySQL
         try {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 import usersApi from "../../../services/usersApi";
 import { apiError } from "../../../utils/apiError";
+import { useAutoDismiss } from "../../../hooks/useAutoDismiss";
 
 const emptyOrganization = { name: "", plan_slug: "" };
 
@@ -23,8 +24,8 @@ export function useOrganizationsWorkspace() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 

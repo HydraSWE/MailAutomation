@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle2, ChevronRight, FileText, Loader2, Send, ShieldAlert, X } from "lucide-react";
 import CustomSelect from "../../../components/common/CustomSelect";
 import { SUPPORTED_NETWORKS } from "./constants";
+import { useAutoDismiss } from "../../../hooks/useAutoDismiss";
 
 
 
@@ -21,7 +22,7 @@ export default function CustomQuoteReviewModal({
   const [ownerNotes, setOwnerNotes] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
 
   // Editable approved limits
   const [emailLimit, setEmailLimit] = useState(300000);

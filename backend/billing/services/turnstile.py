@@ -1,6 +1,6 @@
 from .common import *  # noqa: F401,F403
 
-def verify_turnstile(token, request):
+def verify_turnstile(token, request, *, expected_action=None):
     secret = getattr(settings, "TURNSTILE_SECRET_KEY", "")
     if not secret:
         if getattr(settings, "IS_PRODUCTION", False):
@@ -24,7 +24,7 @@ def verify_turnstile(token, request):
     ]
     if expected_hostnames and payload.get("hostname") not in expected_hostnames:
         raise ValidationError({"turnstile_token": "Checkout verification failed."})
-    expected_action = getattr(settings, "TURNSTILE_CHECKOUT_ACTION", "")
+    expected_action = expected_action if expected_action is not None else getattr(settings, "TURNSTILE_CHECKOUT_ACTION", "")
     if expected_action and payload.get("action") != expected_action:
         raise ValidationError({"turnstile_token": "Checkout verification failed."})
     challenge_ts = payload.get("challenge_ts")

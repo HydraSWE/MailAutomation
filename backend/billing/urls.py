@@ -9,7 +9,7 @@ from .views import (
     PaymentReviewViewSet, PlanAdminViewSet, PlanListView, PublicLandingMonitorView,
     CustomQuoteOtpRequestView, CustomQuoteOtpVerifyView, CustomQuoteSubmitView,
     OwnerCustomQuoteViewSet,
-    PlatformLeadHunterLicensesView, PlatformLeadHunterActionView,
+    LeadHunterDeviceOtpEmailView, PlatformLeadHunterLicensesView, PlatformLeadHunterActionView,
     CustomActivationStartView, CustomActivationRequestOtpView, CustomActivationVerifyOtpView,
     CustomActivationPendingOrgsView, CustomActivationCompleteView,
 )
@@ -40,6 +40,7 @@ urlpatterns = [
     path("platform/blockchain-transaction-inspect/", BlockchainTransactionInspectView.as_view(), name="platform-blockchain-transaction-inspect"),
     path("platform/lead-hunter/licenses/", PlatformLeadHunterLicensesView.as_view(), name="platform-lead-hunter-licenses"),
     path("platform/lead-hunter/licenses/<str:license_key>/action/", PlatformLeadHunterActionView.as_view(), name="platform-lead-hunter-action"),
+    path("lead-hunter/device-otp/send/", LeadHunterDeviceOtpEmailView.as_view(), name="lead-hunter-device-otp-send"),
 
     # Platform Owner Custom Quote Endpoints
     path("platform/custom-quotes/", owner_quote_list, name="platform-custom-quote-list"),

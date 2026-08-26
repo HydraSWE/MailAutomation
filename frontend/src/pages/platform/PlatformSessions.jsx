@@ -3,14 +3,15 @@ import { LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import api from "../../services/api";
 import SearchInput from "../../components/common/SearchInput";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 export default function PlatformSessions() {
   const [sessions, setSessions] = useState([]);
   const [filter, setFilter] = useState("active");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [error, setError] = useAutoDismiss("");
+  const [message, setMessage] = useAutoDismiss("");
   const [sessionToRevoke, setSessionToRevoke] = useState(null);
   const [revoking, setRevoking] = useState(false);
 

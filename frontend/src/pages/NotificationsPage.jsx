@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import api from "../services/api";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const filters = [
   ["", "All"],
@@ -15,8 +16,8 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
   const [selected, setSelected] = useState(null);
 
   const unreadCount = useMemo(() => {

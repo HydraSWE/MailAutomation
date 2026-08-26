@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import usersApi from "../../../services/usersApi";
 import api from "../../../services/api";
 import { apiError } from "../../../utils/apiError";
+import { useAutoDismiss } from "../../../hooks/useAutoDismiss";
 
 const ROLES = [{ value: "admin", label: "Admin" }, { value: "manager", label: "Manager" }, { value: "operator", label: "Operator" }, { value: "viewer", label: "Viewer" }];
 const emptyForm = { name: "", email: "", username: "", password: "", role: "operator", organization: "" };
@@ -11,8 +12,8 @@ export function useUsersWorkspace() {
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
 
   // Filters
   const [search, setSearch] = useState("");

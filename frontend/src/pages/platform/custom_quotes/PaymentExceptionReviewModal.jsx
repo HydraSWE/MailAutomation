@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle, ExternalLink, Loader2, ShieldAlert, X } from "lucide-react";
+import { useAutoDismiss } from "../../../hooks/useAutoDismiss";
 
 export default function PaymentExceptionReviewModal({
   quote,
@@ -13,7 +14,7 @@ export default function PaymentExceptionReviewModal({
   const [notes, setNotes] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
 
   if (!isOpen || !quote || !quote.invoice) return null;
 

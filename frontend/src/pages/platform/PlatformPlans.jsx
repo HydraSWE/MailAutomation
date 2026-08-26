@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Pencil, Plus, Sparkles, Tag, X } from "lucide-react";
 import api from "../../services/api";
 import { apiError } from "../../utils/apiError";
+import { useAutoDismiss } from "../../hooks/useAutoDismiss";
 
 const emptyPlan = {
   slug: "",
@@ -48,8 +49,8 @@ export default function PlatformPlans() {
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
 
   const load = () =>
     api

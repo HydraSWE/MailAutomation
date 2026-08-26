@@ -34,6 +34,7 @@ import {
   startCheckoutEmail,
   verifyCheckoutEmail,
 } from "../services/billingApi";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const networkCardsData = {
   usdt: [
@@ -250,13 +251,13 @@ export default function Subscribe() {
   const [oracleLoading, setOracleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useAutoDismiss("");
   const [verificationOpen, setVerificationOpen] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
   const [verificationBusy, setVerificationBusy] = useState("");
-  const [verificationError, setVerificationError] = useState("");
+  const [verificationError, setVerificationError] = useAutoDismiss("");
   const [deliveryWaiting, setDeliveryWaiting] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(600);
   const [turnstileToken, setTurnstileToken] = useState("");

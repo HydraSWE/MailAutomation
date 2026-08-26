@@ -4,6 +4,7 @@ import supportApi from "../services/supportApi";
 import CustomSelect from "../components/common/CustomSelect";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import { apiError } from "../utils/apiError";
+import { useAutoDismiss } from "../hooks/useAutoDismiss";
 
 const ticketFilterOptions = [
   { value: "all", label: "All" },
@@ -40,8 +41,8 @@ export default function MailWorkspace() {
   const [mailboxForm, setMailboxForm] = useState(emptyMailbox);
   const [editingMailbox, setEditingMailbox] = useState(null);
   const [showMailboxForm, setShowMailboxForm] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useAutoDismiss("");
+  const [error, setError] = useAutoDismiss("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [access, setAccess] = useState(null);

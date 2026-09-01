@@ -105,8 +105,8 @@ export default function CampaignsPage() {
       }
       confirmModal.closeModal();
       fetchCampaigns();
-    } catch (_e) {
-      toast.error(`Failed to ${type} campaign.`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || `Failed to ${type} campaign.`);
     }
   };
 

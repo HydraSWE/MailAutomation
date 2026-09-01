@@ -28,6 +28,7 @@ help_page_preview.html
 *test_*.py
 *_test.py
 *test*.py
+!backend/campaigns/tests.py
 *test
 tests/
 test/

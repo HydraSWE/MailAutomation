@@ -1,3 +1,5 @@
+import logging
+
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.db import transaction
@@ -17,6 +19,24 @@ from .models import Campaign, CampaignClick, CampaignLog, CampaignUnsubscribe
 from .serializers import CampaignLogSerializer, CampaignSerializer
 from .tasks import launch_campaign, send_campaign_email
 from .tracking import anonymized_ip_hash, read_click_token, read_unsubscribe_token
+
+
+logger = logging.getLogger("campaigns.views")
+
+
+def _enqueue_campaign_launch(campaign_id):
+    try:
+        launch_campaign.delay(campaign_id)
+        return True
+    except Exception:
+        # on_commit callbacks execute after the database transaction has
+        # committed. Never leak a broker exception as an HTTP 500 while
+        # leaving the campaign permanently stuck in `queued`.
+        logger.exception("Unable to enqueue campaign %s", campaign_id)
+        Campaign.objects.filter(pk=campaign_id, status=Campaign.Status.QUEUED).update(
+            status=Campaign.Status.DRAFT
+        )
+        return False
 
 
 def _request_ip(request):
@@ -174,19 +194,31 @@ class CampaignViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         from django.db import transaction
         from rest_framework.exceptions import ValidationError
 
+        enqueue_error = []
+
         with transaction.atomic():
             campaign = Campaign.objects.select_for_update().select_related(
                 "template", "recipient_list", "smtp", "organization"
             ).get(pk=self.get_object().pk)
 
-            if campaign.status in {Campaign.Status.QUEUED, Campaign.Status.SENDING}:
+            if campaign.status in {Campaign.Status.QUEUED, Campaign.Status.RUNNING}:
                 raise ValidationError({"detail": "Campaign is already running or queued."})
 
             self._validate_launch(campaign)
             campaign.status = Campaign.Status.QUEUED
             campaign.save(update_fields=["status", "updated_at"])
 
-            transaction.on_commit(lambda: launch_campaign.delay(campaign.id))
+            def enqueue_campaign():
+                if not _enqueue_campaign_launch(campaign.id):
+                    enqueue_error.append(True)
+
+            transaction.on_commit(enqueue_campaign)
+
+        if enqueue_error:
+            return Response(
+                {"detail": "The email queue is temporarily unavailable. Please try launching the campaign again."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response({"detail": "Campaign queued successfully.", "status": Campaign.Status.QUEUED})
 

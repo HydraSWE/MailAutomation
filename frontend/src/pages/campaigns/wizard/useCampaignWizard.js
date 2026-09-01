@@ -77,7 +77,9 @@ export function useCampaignWizard() {
       name: campaignData.name.trim(), subject: campaignData.subject.trim(),
       description: campaignData.description.trim(), template: campaignData.template_id,
       recipient_list: campaignData.recipient_list_id, smtp: campaignData.smtp_id,
-      status: isDraft ? "draft" : campaignData.send_type === "scheduled" ? "scheduled" : "queued",
+      // Immediate campaigns must be persisted as draft first. The launch
+      // endpoint owns the transition to queued after validation and enqueue.
+      status: isDraft || campaignData.send_type === "now" ? "draft" : "scheduled",
       scheduled_at: campaignData.send_type === "scheduled" ? campaignData.scheduled_at : null,
     };
     try {

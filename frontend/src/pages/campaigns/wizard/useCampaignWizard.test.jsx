@@ -48,7 +48,7 @@ describe("useCampaignWizard", () => {
     await act(() => result.current.handleCreateCampaign(false));
     expect(createCampaign).toHaveBeenCalledWith(expect.objectContaining({
       name: "Launch", subject: "Subject", description: "Note", template: 11,
-      recipient_list: 22, smtp: 33, status: "queued", scheduled_at: null,
+      recipient_list: 22, smtp: 33, status: "draft", scheduled_at: null,
     }));
     expect(startCampaign).toHaveBeenCalledWith(44);
     expect(navigate).toHaveBeenCalledWith("/campaigns");

@@ -7,6 +7,7 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.utils.html import escape
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -161,24 +162,27 @@ class CampaignViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user, organization=request_organization(self.request))
 
     def _validate_launch(self, campaign, count=None):
+        if not campaign.organization:
+            raise ValidationError({"detail": "Campaign is not assigned to an organization."})
         if campaign.status == Campaign.Status.CANCELLED:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({"detail": "Campaign is cancelled and cannot be re-launched."})
+        if not campaign.recipient_list:
+            raise ValidationError({"detail": "A recipient list is required before launching the campaign."})
+        if not campaign.template:
+            raise ValidationError({"detail": "An email template is required before launching the campaign."})
+        if not campaign.smtp:
+            raise ValidationError({"detail": "An SMTP account is required before launching the campaign."})
         validate_organization_active(campaign.organization)
         count = count if count is not None else campaign.recipient_list.recipients.filter(status="active").count()
         if count <= 0:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({"detail": "Campaign has no active recipients."})
         validate_email_quota(campaign.organization, count)
         if usage_snapshot(campaign.organization)["campaigns_remaining"] <= 0:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({"detail": "Daily campaign limit reached for this account."})
-        if not campaign.smtp or not campaign.smtp.status:
-            from rest_framework.exceptions import ValidationError
+        if not campaign.smtp.status:
             raise ValidationError({"detail": "A valid active SMTP account is required."})
         today_sent = campaign.smtp.sent_today if campaign.smtp.sent_date == timezone.localdate() else 0
         if count > max(campaign.smtp.daily_limit - today_sent, 0):
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({"detail": "SMTP daily sending limit reached."})
         return count
 
@@ -191,8 +195,21 @@ class CampaignViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         return self._do_launch()
 
     def _do_launch(self):
+        try:
+            return self._perform_launch()
+        except APIException:
+            raise
+        except Exception:
+            request_id = self.request.META.get("HTTP_X_RAILWAY_REQUEST_ID", "")
+            logger.exception(
+                "Unexpected campaign launch failure campaign=%s request_id=%s",
+                self.kwargs.get("pk"),
+                request_id or "unavailable",
+            )
+            raise
+
+    def _perform_launch(self):
         from django.db import transaction
-        from rest_framework.exceptions import ValidationError
 
         enqueue_error = []
 

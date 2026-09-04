@@ -52,3 +52,4 @@ subscribe_multicurrency_mock.html
 backend/billing/run_tests.py
 backend/billing/simulate_dual_crypto_flow.py
 deploy/php/
+currency_switch_pricing_mock.html

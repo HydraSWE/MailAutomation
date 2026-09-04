@@ -22,6 +22,7 @@ const NETWORK_PLACEHOLDERS = {
 
 const emptyBilling = {
   usdt_bdt_rate: "",
+  usd_price_display_enabled: true,
   payment_evm_wallet: "",
   payment_tron_wallet: "",
   payment_ton_wallet: "",
@@ -77,6 +78,7 @@ export default function PlatformBilling() {
     setSaving(true);
     const payload = {
       usdt_bdt_rate: billing.usdt_bdt_rate,
+      usd_price_display_enabled: Boolean(billing.usd_price_display_enabled),
       payment_evm_wallet: billing.payment_evm_wallet,
       payment_tron_wallet: billing.payment_tron_wallet,
       payment_ton_wallet: billing.payment_ton_wallet,
@@ -151,20 +153,48 @@ export default function PlatformBilling() {
         <Section
           icon={CircleDollarSign}
           title="Exchange rate"
-          description="Used when creating new USDT quotes. Existing invoices retain their original rate."
+          description="Used for USDT quotes and the USD equivalent displayed beside BDT prices. Existing invoices retain their original rate."
         >
-          <label className="block max-w-sm text-xs text-slate-400">
-            USDT to BDT rate
-            <input
-              className="mt-1 w-full"
-              required
-              type="number"
-              min="0.0001"
-              step="0.0001"
-              value={billing.usdt_bdt_rate}
-              onChange={(event) => setBilling({ ...billing, usdt_bdt_rate: event.target.value })}
-            />
-          </label>
+          <div className="space-y-5">
+            <label className="block max-w-sm text-xs text-slate-400">
+              USDT / USD to BDT rate
+              <input
+                className="mt-1 w-full"
+                required
+                type="number"
+                min="0.0001"
+                step="0.0001"
+                value={billing.usdt_bdt_rate}
+                onChange={(event) => setBilling({ ...billing, usdt_bdt_rate: event.target.value })}
+              />
+            </label>
+            <div className="flex max-w-xl items-center justify-between gap-5 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-200">Show USD equivalent</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Display the converted USD amount beside the canonical BDT price on public pricing and payment cards.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={billing.usd_price_display_enabled}
+                aria-label="Show USD equivalent beside BDT prices"
+                onClick={() => setBilling({ ...billing, usd_price_display_enabled: !billing.usd_price_display_enabled })}
+                className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
+                  billing.usd_price_display_enabled
+                    ? "border-indigo-400/60 bg-indigo-600"
+                    : "border-slate-700 bg-slate-800"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    billing.usd_price_display_enabled ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </Section>
 
         <Section

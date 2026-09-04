@@ -3,6 +3,7 @@ import { Link, useBeforeUnload, useBlocker, useLocation, useNavigate, useParams 
 import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, Copy, ExternalLink, Loader2, RefreshCw, ShieldCheck, Wallet, XCircle } from "lucide-react";
 import { apiError, cancelInvoice, exchangeInvoiceCode, getCurrentInvoice, getInvoice, recoverInvoice, replaceInvoice, verifyInvoice } from "../services/billingApi";
 import { useAutoDismiss } from "../hooks/useAutoDismiss";
+import UsdPrice, { formatUsd } from "../components/common/UsdPrice";
 
 const labels = { bsc: "BNB Smart Chain", ethereum: "Ethereum", tron: "Tron", ton: "TON" };
 
@@ -196,9 +197,10 @@ export default function Payment() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-slate-500 mt-1">
-                {labels[invoice.network]} · invoice {invoice.id.slice(0, 8)} · ৳{Number(invoice.price_bdt).toLocaleString()}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <span>{labels[invoice.network]} · invoice {invoice.id.slice(0, 8)} · ৳{Number(invoice.price_bdt).toLocaleString()}</span>
+                <UsdPrice value={invoice.price_usd} />
+              </div>
             </div>
             <span className={`flex items-center gap-2 text-sm ${expired ? "text-rose-300" : "text-amber-300"}`}>
               <Clock3 className="w-4 h-4" /> {expired ? "Quote expired" : `Expires ${new Date(invoice.expires_at).toLocaleString()}`}
@@ -217,7 +219,7 @@ export default function Payment() {
                     `${Number(customLimits.max_users).toLocaleString()} users`,
                     `${Number(customLimits.max_smtp_accounts).toLocaleString()} SMTP + inboxes`,
                     `${Number(customLimits.max_recipients).toLocaleString()} recipients`,
-                    `Payable ৳${Number(customLimits.payable_price_bdt || invoice.price_bdt).toLocaleString()}`,
+                    `Payable ৳${Number(customLimits.payable_price_bdt || invoice.price_bdt).toLocaleString()}${invoice.price_usd ? ` (${formatUsd(invoice.price_usd)})` : ""}`,
                   ].map((item) => (
                     <span key={item} className="flex gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-cyan-300" />

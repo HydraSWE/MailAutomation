@@ -111,6 +111,10 @@ class BillingConfiguration(models.Model):
 
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
     usdt_bdt_rate = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal("122.0000"))
+    usd_price_display_enabled = models.BooleanField(
+        default=True,
+        help_text="Show the USD equivalent beside canonical BDT prices.",
+    )
     payment_evm_wallet = models.CharField(max_length=128)
     payment_tron_wallet = models.CharField(max_length=128)
     payment_ton_wallet = models.CharField(max_length=128)

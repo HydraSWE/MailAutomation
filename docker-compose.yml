@@ -32,6 +32,12 @@ services:
       dockerfile: backend/Dockerfile
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://mailuser:mailpass@db:5432/mailautomation
+      REDIS_URL: redis://redis:6379/0
+      CACHE_REDIS_URL: redis://redis:6379/1
+      MEDIA_STORAGE_BACKEND: local
+      BLOB_READ_WRITE_TOKEN: ""
     volumes:
       - ./backend:/app
       - ./media:/app/media
@@ -58,6 +64,11 @@ services:
     env_file: .env
     environment:
       SKIP_MIGRATIONS: "1"
+      DATABASE_URL: postgresql://mailuser:mailpass@db:5432/mailautomation
+      REDIS_URL: redis://redis:6379/0
+      CACHE_REDIS_URL: redis://redis:6379/1
+      MEDIA_STORAGE_BACKEND: local
+      BLOB_READ_WRITE_TOKEN: ""
     volumes:
       - ./backend:/app
       - ./media:/app/media
@@ -76,6 +87,12 @@ services:
     env_file: .env
     environment:
       SKIP_MIGRATIONS: "1"
+      DATABASE_URL: postgresql://mailuser:mailpass@db:5432/mailautomation
+      REDIS_URL: redis://redis:6379/0
+      CACHE_REDIS_URL: redis://redis:6379/1
+      MEDIA_STORAGE_BACKEND: local
+      BLOB_READ_WRITE_TOKEN: ""
+    profiles: ["scheduled"]
     volumes:
       - ./backend:/app
     depends_on:

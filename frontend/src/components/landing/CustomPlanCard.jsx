@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, ChevronRight, SlidersHorizontal, Sparkles } from "lucide-react";
 import CustomQuoteModal from "./CustomQuoteModal";
+import UsdPrice, { usdFromBdt } from "../common/UsdPrice";
 
 const format = (value) => new Intl.NumberFormat("en-US").format(value || 0);
 
@@ -103,10 +104,11 @@ export default function CustomPlanCard({ basePlan, customPlan, addonPrices }) {
                 ৳{format(estimatedOriginal)}
               </span>
             )}
-            <div className="flex items-baseline gap-1">
+            <div className="flex flex-wrap items-baseline gap-2">
               <strong className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                 {needsQuote ? "Custom quote" : `৳${format(estimatedPayable)}`}
               </strong>
+              {!needsQuote && <UsdPrice value={usdFromBdt(estimatedPayable, customPlan || basePlan)} />}
               {!needsQuote && <span className="text-slate-400 text-xs font-medium">/ 30d</span>}
             </div>
             <p className="mt-1 text-[11px] text-slate-400">

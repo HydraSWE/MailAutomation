@@ -214,7 +214,7 @@ class CampaignViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
         enqueue_error = []
 
         with transaction.atomic():
-            campaign = Campaign.objects.select_for_update().select_related(
+            campaign = Campaign.objects.select_for_update(of=("self",)).select_related(
                 "template", "recipient_list", "smtp", "organization"
             ).get(pk=self.get_object().pk)
 
@@ -223,7 +223,7 @@ class CampaignViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
             self._validate_launch(campaign)
             campaign.status = Campaign.Status.QUEUED
-            campaign.save(update_fields=["status", "updated_at"])
+            campaign.save(update_fields=["status"])
 
             def enqueue_campaign():
                 if not _enqueue_campaign_launch(campaign.id):

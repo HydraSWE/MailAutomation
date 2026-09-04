@@ -35,6 +35,7 @@ import {
   verifyCheckoutEmail,
 } from "../services/billingApi";
 import { useAutoDismiss } from "../hooks/useAutoDismiss";
+import UsdPrice, { usdFromBdt } from "../components/common/UsdPrice";
 
 const networkCardsData = {
   usdt: [
@@ -685,7 +686,7 @@ export default function Subscribe() {
               {plan && (
                 <div className="mt-6 p-4 rounded-2xl bg-slate-950/70 border border-white/[0.07]">
                   {isCustom && preview ? (
-                    <CustomPriceSummary preview={preview} />
+                    <CustomPriceSummary preview={preview} pricingSource={plan || premiumPlusPlan} />
                   ) : (
                     <>
                       {plan.discount_percent > 0 && !plan.is_free && (
@@ -698,10 +699,11 @@ export default function Subscribe() {
                           </span>
                         </div>
                       )}
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex flex-wrap items-baseline gap-2">
                         <strong className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                           {plan.is_free ? "Free" : `৳${plan.price_bdt.toLocaleString()}`}
                         </strong>
+                        <UsdPrice value={plan.price_usd} />
                         <span className="text-xs text-slate-400 font-normal">/ 30-day cycle</span>
                       </div>
                     </>
@@ -1280,7 +1282,7 @@ export default function Subscribe() {
   );
 }
 
-function CustomPriceSummary({ preview }) {
+function CustomPriceSummary({ preview, pricingSource }) {
   return (
     <div>
       {preview.discountPercent > 0 && (
@@ -1291,8 +1293,9 @@ function CustomPriceSummary({ preview }) {
           </span>
         </div>
       )}
-      <p className="text-2xl sm:text-3xl font-extrabold text-white">
-        ৳{format(preview.payablePrice)}{" "}
+      <p className="flex flex-wrap items-baseline gap-2 text-2xl sm:text-3xl font-extrabold text-white">
+        <span>৳{format(preview.payablePrice)}</span>
+        <UsdPrice value={usdFromBdt(preview.payablePrice, pricingSource)} />
         <span className="text-xs font-normal text-slate-400">/ 30-day cycle</span>
       </p>
       <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/60 p-3 text-xs space-y-1.5">

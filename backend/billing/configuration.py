@@ -47,6 +47,7 @@ def get_billing_configuration():
 @dataclass(frozen=True)
 class RuntimeBillingConfiguration:
     usdt_bdt_rate: Decimal
+    usd_price_display_enabled: bool
     payment_evm_wallet: str
     payment_tron_wallet: str
     payment_ton_wallet: str
@@ -75,6 +76,7 @@ def get_runtime_billing_configuration():
     config = get_billing_configuration()
     return RuntimeBillingConfiguration(
         usdt_bdt_rate=config.usdt_bdt_rate,
+        usd_price_display_enabled=getattr(config, "usd_price_display_enabled", True),
         payment_evm_wallet=config.payment_evm_wallet,
         payment_tron_wallet=config.payment_tron_wallet,
         payment_ton_wallet=config.payment_ton_wallet,

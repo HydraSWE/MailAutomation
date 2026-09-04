@@ -5,12 +5,41 @@ from django.conf import settings
 from rest_framework import serializers
 from django.db import transaction
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from common.models import Organization
 from .models import PaymentInvoice, PaymentTransferLedger, Plan
 
 User = get_user_model()
+
+
+def _usd_equivalent(price_bdt, rate):
+    rate = Decimal(str(rate))
+    if rate <= 0:
+        return None
+    return (Decimal(str(price_bdt or 0)) / rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+class PricingDisplayMixin:
+    def _pricing_config(self):
+        if not hasattr(self, "_cached_pricing_config"):
+            from .configuration import get_runtime_billing_configuration
+
+            self._cached_pricing_config = get_runtime_billing_configuration()
+        return self._cached_pricing_config
+
+    def get_usd_price_display_enabled(self, obj):
+        return self._pricing_config().usd_price_display_enabled
+
+    def get_usd_bdt_rate(self, obj):
+        return format(self._pricing_config().usdt_bdt_rate, ".4f")
+
+    def _display_usd(self, price_bdt):
+        config = self._pricing_config()
+        if not config.usd_price_display_enabled:
+            return None
+        amount = _usd_equivalent(price_bdt, config.usdt_bdt_rate)
+        return format(amount, ".2f") if amount is not None else None
 
 
 def validate_network_enabled(value):
@@ -25,8 +54,12 @@ def validate_network_enabled(value):
     return value
 
 
-class PlanSerializer(serializers.ModelSerializer):
+class PlanSerializer(PricingDisplayMixin, serializers.ModelSerializer):
     addon_prices = serializers.SerializerMethodField()
+    price_usd = serializers.SerializerMethodField()
+    original_price_usd = serializers.SerializerMethodField()
+    usd_price_display_enabled = serializers.SerializerMethodField()
+    usd_bdt_rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Plan
@@ -36,12 +69,19 @@ class PlanSerializer(serializers.ModelSerializer):
             "max_users", "max_smtp_accounts", "is_free", "max_recipients",
             "max_campaigns_per_day", "is_featured", "badge_text", "button_text",
             "features_list", "support_workspace_enabled", "display_order", "addon_prices",
+            "price_usd", "original_price_usd", "usd_price_display_enabled", "usd_bdt_rate",
         )
 
     def get_addon_prices(self, obj):
         from .configuration import get_runtime_billing_configuration
 
         return get_runtime_billing_configuration().addon_prices
+
+    def get_price_usd(self, obj):
+        return self._display_usd(obj.price_bdt)
+
+    def get_original_price_usd(self, obj):
+        return self._display_usd(obj.original_price_bdt)
 
 
 class PlanAdminSerializer(serializers.ModelSerializer):
@@ -264,6 +304,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
     plan = PlanSerializer(read_only=True)
     explorer_url = serializers.SerializerMethodField()
     replaced_by = serializers.UUIDField(source="replaced_by_id", read_only=True)
+    price_usd = serializers.SerializerMethodField()
+    usd_price_display_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = PaymentInvoice
@@ -271,6 +313,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "id", "plan", "network", "payment_asset", "crypto_symbol", "crypto_amount",
             "oracle_usd_rate", "rate_locked_until", "receiving_address", "token_contract",
             "price_bdt", "usdt_bdt_rate", "amount_usdt", "status", "transaction_hash",
+            "price_usd", "usd_price_display_enabled",
             "verification_error", "expires_at", "verified_at", "created_at", "explorer_url",
             "replaced_by", "snapshot_limits", "invoice_email_sent_at", "invoice_email_error",
             "recovery_email_sent_at", "recovery_email_error", "confirmation_email_sent_at",
@@ -288,6 +331,17 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "ton": "https://tonviewer.com/transaction/",
         }
         return f"{bases[obj.network]}{obj.transaction_hash}"
+
+    def get_usd_price_display_enabled(self, obj):
+        from .configuration import get_runtime_billing_configuration
+
+        return get_runtime_billing_configuration().usd_price_display_enabled
+
+    def get_price_usd(self, obj):
+        if not self.get_usd_price_display_enabled(obj):
+            return None
+        amount = _usd_equivalent(obj.price_bdt, obj.usdt_bdt_rate)
+        return format(amount, ".2f") if amount is not None else None
 
 
 class TransactionSubmissionSerializer(serializers.Serializer):
@@ -455,4 +509,3 @@ class CustomActivationCompleteSerializer(serializers.Serializer):
             attrs["name"] = (attrs.get("name") or "").strip()
 
         return attrs
-

@@ -12,6 +12,7 @@ import {
 import { getUser } from "../utils/auth";
 import CustomSelect from "../components/common/CustomSelect";
 import { useAutoDismiss } from "../hooks/useAutoDismiss";
+import UsdPrice, { formatUsd, usdFromBdt } from "../components/common/UsdPrice";
 
 const paidNetworks = [
   ["bsc", "BNB Smart Chain (BEP20 USDT)"],
@@ -262,7 +263,8 @@ export default function AccountAdmin() {
               </div>
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                 The platform owner approved your custom quote at{" "}
-                <strong>৳{Number(activeQuote.quoted_price_bdt || 0).toLocaleString()} / 30 days</strong>.
+                <strong>৳{Number(activeQuote.quoted_price_bdt || 0).toLocaleString()} / 30 days</strong>{" "}
+                <UsdPrice value={activeQuote.invoice.price_usd} className="ml-1 align-middle" />.
                 {activeQuote.owner_notes && (
                   <span className="block mt-1 text-slate-400 italic">
                     Note: &ldquo;{activeQuote.owner_notes}&rdquo;
@@ -398,8 +400,8 @@ export default function AccountAdmin() {
                       return {
                         value: plan.slug,
                         label: hasDiscount
-                          ? `${plan.name} : ৳${plan.price_bdt.toLocaleString()} / 30d (${plan.discount_percent}% off, was ৳${originalPrice.toLocaleString()})`
-                          : `${plan.name} : ৳${plan.price_bdt.toLocaleString()} / 30d`,
+                          ? `${plan.name} : ৳${plan.price_bdt.toLocaleString()}${plan.price_usd ? ` (${formatUsd(plan.price_usd)})` : ""} / 30d (${plan.discount_percent}% off, was ৳${originalPrice.toLocaleString()})`
+                          : `${plan.name} : ৳${plan.price_bdt.toLocaleString()}${plan.price_usd ? ` (${formatUsd(plan.price_usd)})` : ""} / 30d`,
                       };
                     }),
                 ]}
@@ -485,11 +487,10 @@ export default function AccountAdmin() {
                       Enterprise Quote
                     </span>
                   ) : (
-                    <div className="text-right">
-                      <span className="text-base font-black text-emerald-400">
-                        ৳{pricing.total.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-slate-400 ml-1">/ 30 days</span>
+                    <div className="flex flex-wrap items-center justify-end gap-2 text-right">
+                      <span className="text-base font-black text-emerald-400">৳{pricing.total.toLocaleString()}</span>
+                      <UsdPrice value={usdFromBdt(pricing.total, customPlan || premiumPlusPlan)} />
+                      <span className="text-[10px] text-slate-400">/ 30 days</span>
                     </div>
                   )}
                 </div>
@@ -700,7 +701,10 @@ export default function AccountAdmin() {
                   )}
                   <div className="pt-2 border-t border-slate-800 flex justify-between font-bold text-xs">
                     <span className="text-white">Payable (30 Days)</span>
-                    <span className="text-emerald-300 font-extrabold text-sm">৳{pricing.total.toLocaleString()}</span>
+                    <span className="flex flex-wrap items-center justify-end gap-2 text-emerald-300 font-extrabold text-sm">
+                      <span>৳{pricing.total.toLocaleString()}</span>
+                      <UsdPrice value={usdFromBdt(pricing.total, customPlan || premiumPlusPlan)} />
+                    </span>
                   </div>
                 </div>
               )}

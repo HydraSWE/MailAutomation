@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Check, ChevronRight } from "lucide-react";
 import CustomPlanCard from "./CustomPlanCard";
+import UsdPrice from "../common/UsdPrice";
 
 const format = (value) => new Intl.NumberFormat("en-US").format(value || 0);
 
@@ -92,18 +93,20 @@ export default function LandingPricing({ plans, loadingPlans, error }) {
                             <span className="line-through text-xs font-semibold text-slate-400">
                               ৳{format(plan.original_price_bdt || plan.price_bdt)}
                             </span>
-                            <div className="flex items-baseline gap-1">
+                            <div className="flex flex-wrap items-baseline gap-2">
                               <strong className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                                 ৳{format(plan.price_bdt)}
                               </strong>
+                              <UsdPrice value={plan.price_usd} />
                               <span className="text-slate-400 text-xs font-medium">/ 30d</span>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-baseline gap-1">
+                          <div className="flex flex-wrap items-baseline gap-2">
                             <strong className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                               {isPlanFree ? "Free" : `৳${format(plan.price_bdt)}`}
                             </strong>
+                            <UsdPrice value={plan.price_usd} />
                             {!isPlanFree && (
                               <span className="text-slate-400 text-xs font-medium">/ 30d</span>
                             )}

@@ -15,6 +15,8 @@ class CampaignLaunchQueueTests(SimpleTestCase):
         launch_source = inspect.getsource(CampaignViewSet._perform_launch)
         self.assertIn("Campaign.Status.RUNNING", launch_source)
         self.assertNotIn("Campaign.Status.SENDING", launch_source)
+        self.assertIn('select_for_update(of=("self",))', launch_source)
+        self.assertIn('campaign.save(update_fields=["status"])', launch_source)
 
     def test_launch_rejects_missing_organization_without_server_error(self):
         campaign = SimpleNamespace(organization=None)

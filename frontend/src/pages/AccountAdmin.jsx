@@ -1,3 +1,4 @@
+import { AppSumoBilling } from "./AppSumo";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CalendarClock, Check, CheckCircle2, Clock, CreditCard, Loader2, Sparkles, XCircle } from "lucide-react";
@@ -165,9 +166,14 @@ export default function AccountAdmin() {
     return <div className="text-slate-400 p-6">Loading account...</div>;
   }
 
+  const isLifetime = account.subscription?.access_type === "lifetime";
   const unlimited = (limit) => (limit === 0 ? "Unlimited" : limit);
 
-  const cards = [
+  const cards = isLifetime ? [
+    ["Active team seats (including admins)", (account.admin_count || 0) + (account.user_count || 0), account.max_users],
+    ["Mailboxes (SMTP + inbox)", account.mail_connection_count, account.max_smtp_accounts],
+    ["30-Day Emails", account.usage?.monthly_sent ?? 0, account.monthly_email_limit],
+  ] : [
     ["Administrators", account.admin_count, account.max_admins],
     ["Users", account.user_count, account.max_users],
     ["SMTP Accounts", account.smtp_count, account.max_smtp_accounts],
@@ -178,6 +184,7 @@ export default function AccountAdmin() {
 
   return (
     <div className="space-y-6">
+      <AppSumoBilling onChange={load} />
       {/* Header & Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -208,7 +215,7 @@ export default function AccountAdmin() {
             <div>
               <p className="font-black text-sm text-white">{account.subscription.plan_name}</p>
               <p className="text-[11px] text-slate-400">
-                Renews or expires{" "}
+                {isLifetime ? "Usage resets" : "Renews or expires"}{" "}
                 <span className="text-indigo-300 font-semibold">
                   {new Date(account.subscription.current_period_end).toLocaleDateString("en-US", {
                     month: "short",
@@ -350,7 +357,7 @@ export default function AccountAdmin() {
       </div>
 
       {/* Upgrade Subscription Section */}
-      {role === "admin" && (
+      {role === "admin" && !isLifetime && (
         <section className="p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl relative">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
             <div className="flex items-start gap-3">

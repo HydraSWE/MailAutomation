@@ -1,3 +1,5 @@
+from django.db import transaction
+from common.models import Organization
 from .common import *  # noqa: F401,F403
 from .common import _is_last_active_admin, _request_user
 
@@ -138,8 +140,15 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response({"detail": "User deactivated."})
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def reactivate(self, request, pk=None):
         target = cast(User, self.get_object())
+        from billing.appsumo import entitlement_for, tier_for
+        if target.organization_id:
+            org = Organization.objects.select_for_update().get(pk=target.organization_id)
+            ent = entitlement_for(org)
+            if ent and not target.is_active and org.users.filter(is_active=True).count() >= tier_for(ent).limits["seats"]:
+                return Response({"detail": "Active team seat limit reached."}, status=400)
         target.is_active = True
         target.save(update_fields=["is_active"])
         return Response({"detail": "User reactivated."})

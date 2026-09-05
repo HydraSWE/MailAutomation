@@ -23,6 +23,12 @@ def _subscription_window(organization, now):
         subscription = organization.subscription
     except (AttributeError, ObjectDoesNotExist):
         return None
+    if subscription.access_type == "lifetime":
+        from billing.appsumo import entitlement_for, bounds
+        ent = entitlement_for(organization)
+        if ent:
+            subscription.current_period_start, subscription.current_period_end = bounds(ent, now)
+        return subscription
     if subscription.current_period_end <= now and subscription.plan.is_free:
         elapsed = now - subscription.current_period_end
         periods = (elapsed.days // 30) + 1
@@ -57,8 +63,12 @@ def usage_snapshot(organization, on_date=None):
         organization=organization, date__gte=week_start, date__lte=week_end
     ).aggregate(sent=Sum("emails_sent"))["sent"] or 0
 
+    if subscription and subscription.access_type == "lifetime":
+        from billing.appsumo import usage_for
+        lifetime_usage = usage_for(organization)
+        period_sent = lifetime_usage.emails_sent
     daily_sent = daily.emails_sent if daily else 0
-    period_sent = period["sent"] or 0
+    period_sent = lifetime_usage.emails_sent if subscription and subscription.access_type == "lifetime" else (period["sent"] or 0)
     daily_remaining = None if organization.daily_email_limit == 0 else max(organization.daily_email_limit - daily_sent, 0)
     weekly_remaining = None if organization.weekly_email_limit == 0 else max(organization.weekly_email_limit - weekly_sent, 0)
     return {
@@ -80,6 +90,10 @@ def usage_snapshot(organization, on_date=None):
 
 
 def validate_organization_active(organization):
+    from billing.appsumo import entitlement_for, require_productive
+    if entitlement_for(organization):
+        require_productive(organization)
+        return
     subscription = _subscription_window(organization, timezone.now())
     if organization.status != Organization.Status.ACTIVE:
         raise ValidationError({"detail": MESSAGES["inactive"]})

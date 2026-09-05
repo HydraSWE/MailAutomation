@@ -6,4 +6,4 @@ class BillingConfig(AppConfig):
     name = "billing"
 
     def ready(self):
-        from . import checks  # noqa: F401
+        from . import checks, appsumo_checks  # noqa: F401

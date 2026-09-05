@@ -157,7 +157,8 @@ class RegistrationFieldsSerializer(serializers.Serializer):
         attrs["password_hash"] = make_password(attrs.pop("password"))
         return attrs
 
-class FreeSignupSerializer(RegistrationFieldsSerializer):
+
+class FreeSignupSerializer(RegistrationFieldsSerializer):
     plan_slug = serializers.SlugField(required=False, allow_blank=True)
     turnstile_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
@@ -169,7 +170,7 @@ class InvoiceCreateSerializer(RegistrationFieldsSerializer):
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
 
     def validate_plan_slug(self, value):
-        if value == "custom" or not Plan.objects.filter(slug=value, is_active=True, is_free=False).exists():
+        if value == "custom" or not Plan.objects.filter(slug=value, is_active=True, is_free=False, channel="direct").exists():
             raise serializers.ValidationError("Choose an active paid plan.")
         return value
 
@@ -240,7 +241,7 @@ class AccountInvoiceCreateSerializer(serializers.Serializer):
     idempotency_key = serializers.CharField(max_length=96, required=False, allow_blank=True)
 
     def validate_plan_slug(self, value):
-        if value == "custom" or not Plan.objects.filter(slug=value, is_active=True, is_free=False).exists():
+        if value == "custom" or not Plan.objects.filter(slug=value, is_active=True, is_free=False, channel="direct").exists():
             raise serializers.ValidationError("Choose an active paid plan.")
         return value
 

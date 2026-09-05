@@ -78,6 +78,16 @@ def process_custom_invoice_transfer(invoice_id: str, transfer: Any, *, manual_ap
     if invoice.status == PaymentInvoice.Status.PAID:
         return invoice
 
+    from django.contrib.auth import get_user_model
+    from common.models import Organization
+    from ..appsumo import entitlement_for
+    existing = get_user_model().objects.filter(email__iexact=invoice.customer_email).first()
+    organization_id = invoice.organization_id or (existing.organization_id if existing else None)
+    organization = Organization.objects.select_for_update().filter(pk=organization_id).first()
+    if invoice.plan.channel != "direct" or (organization and entitlement_for(organization)):
+        record_payment_exception(invoice, transfer, "lifetime_entitlement_conflict")
+        return invoice
+
     quote = CustomPlanQuote.objects.filter(invoice=invoice).first()
     decision = match_invoice_payment(invoice, transfer)
 

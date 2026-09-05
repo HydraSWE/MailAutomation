@@ -24,6 +24,7 @@ export default function SettingsPage() {
     showEmailModal, setShowEmailModal, emailStep, setEmailStep, newEmail, setNewEmail,
     emailPassword, setEmailPassword, emailOtp, setEmailOtp, emailLoading,
     handleOpenEmailModal, handleRequestEmailChange, handleConfirmEmailChange,
+    reset2FAModal, onConfirmResetUser2FA,
     twoFAStatus, showSetup2FA, setShowSetup2FA, setup2FAData, setup2FAStep, setSetup2FAStep,
     setup2FACode, setSetup2FACode, setup2FABackupCodes, setup2FALoading, showDisable2FA,
     setShowDisable2FA, disable2FAPassword, setDisable2FAPassword, showRegenCodes,

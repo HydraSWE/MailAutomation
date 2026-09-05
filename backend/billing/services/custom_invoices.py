@@ -29,6 +29,11 @@ def create_owner_approved_invoice(
     owner_notes: str = "",
 ) -> PaymentInvoice:
     quote = CustomPlanQuote.objects.select_for_update().get(pk=quote.pk)
+    from django.contrib.auth import get_user_model
+    from ..appsumo import require_direct
+    existing = get_user_model().objects.select_related("organization").filter(email__iexact=quote.customer_email).first()
+    if existing and existing.organization_id:
+        require_direct(existing.organization)
     if quote.status not in (CustomPlanQuote.Status.PENDING_REVIEW, CustomPlanQuote.Status.INVOICED):
         raise ValidationError({"detail": f"Quote cannot be invoiced from status '{quote.status}'."})
 

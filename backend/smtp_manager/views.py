@@ -66,7 +66,11 @@ class SMTPAccountViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
                 return Response({"detail": "SMTP daily sending limit reached."}, status=400)
             subject = str(request.data.get("subject") or "Test Email from Mail Flow")[:180]
             message = str(request.data.get("message") or "This is a test email sent from Mail Flow.")[:20000]
-            result = send_test_mail(account, recipient_email, subject=subject, message=message)
+            from billing.appsumo import metered_delivery
+            import uuid
+            key = "smtp-test:" + str(request.headers.get("Idempotency-Key") or uuid.uuid4().hex)[:100]
+            result = metered_delivery(account.organization if account.organization_id else None, key,
+                lambda: send_test_mail(account, recipient_email, subject=subject, message=message))
             if account.organization_id:
                 record_email_result(account.organization_id, sent=bool(result.get("ok")))
             if result.get("ok"):

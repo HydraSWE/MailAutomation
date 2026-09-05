@@ -135,6 +135,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_RATES": {
+        "appsumo": "120/minute",
+        "appsumo_signup": "20/hour",
         "login": None if DISABLE_THROTTLING else "10/minute",
         "file_import": None if DISABLE_THROTTLING else "10/hour",
         "smtp_test": None if DISABLE_THROTTLING else "20/hour",
@@ -325,3 +327,10 @@ PAYMENT_NETWORK_ETHEREUM_ENABLED = os.getenv("PAYMENT_NETWORK_ETHEREUM_ENABLED",
 PAYMENT_NETWORK_TRON_ENABLED = os.getenv("PAYMENT_NETWORK_TRON_ENABLED", "0" if IS_PRODUCTION else "1") == "1"
 PAYMENT_NETWORK_TON_ENABLED = os.getenv("PAYMENT_NETWORK_TON_ENABLED", "0" if IS_PRODUCTION else "1") == "1"
 TRUST_X_FORWARDED_FOR = os.getenv("TRUST_X_FORWARDED_FOR", "0") == "1"
+
+# AppSumo is opt-in. These flags never disable an existing entitlement.
+APPSUMO_REDEMPTION_ENABLED = os.getenv("APPSUMO_REDEMPTION_ENABLED", "0") == "1"
+APPSUMO_CODE_ADMIN_ENABLED = os.getenv("APPSUMO_CODE_ADMIN_ENABLED", "0") == "1"
+APPSUMO_OWNER_SMOKE_ENABLED = os.getenv("APPSUMO_OWNER_SMOKE_ENABLED", "0") == "1"
+APPSUMO_ENVIRONMENT = "production" if IS_PRODUCTION else os.getenv("APPSUMO_ENVIRONMENT", "test")
+APPSUMO_CODE_KEY = os.getenv("APPSUMO_CODE_KEY", "")

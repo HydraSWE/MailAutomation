@@ -157,6 +157,8 @@ def _find_conflicting_invoice(validated_data, customer_email, org_key):
 
 @transaction.atomic
 def create_invoice(validated_data):
+    from ..appsumo import require_direct
+    require_direct(validated_data.get("organization"))
     idempotency_key = (validated_data.pop("idempotency_key", "") or "").strip()[:96]
     customer_email = normalized_email(validated_data["customer_email"])
     org_key = normalized_org_name(validated_data["organization_name"])
@@ -174,7 +176,7 @@ def create_invoice(validated_data):
     plan_slug = validated_data.pop("plan_slug")
     if plan_slug == CUSTOM_PLAN_SLUG:
         raise ValidationError({"plan_slug": "Custom plans must use the custom checkout."})
-    plan = Plan.objects.select_for_update().get(slug=plan_slug, is_active=True, is_free=False)
+    plan = Plan.objects.select_for_update().get(slug=plan_slug, is_active=True, is_free=False, channel="direct")
     network = validated_data["network"]
     billing_config = get_runtime_billing_configuration()
     validated_data["customer_email"] = customer_email
@@ -206,6 +208,8 @@ def create_invoice(validated_data):
 
 @transaction.atomic
 def create_custom_invoice(validated_data):
+    from ..appsumo import require_direct
+    require_direct(validated_data.get("organization"))
     idempotency_key = (validated_data.pop("idempotency_key", "") or "").strip()[:96]
     limits = validated_data.pop("limits")
     customer_email = normalized_email(validated_data["customer_email"])

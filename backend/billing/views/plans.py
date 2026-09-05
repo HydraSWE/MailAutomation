@@ -4,14 +4,14 @@ class PlanListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        plans = Plan.objects.filter(is_active=True)
+        plans = Plan.objects.filter(is_active=True, channel="direct")
         return Response(PlanSerializer(plans, many=True).data)
 
 
 class PlanAdminViewSet(viewsets.ModelViewSet):
     serializer_class = PlanAdminSerializer
     permission_classes = [OwnerOnly]
-    queryset = Plan.objects.all().order_by("display_order", "price_bdt")
+    queryset = Plan.objects.filter(channel="direct").order_by("display_order", "price_bdt")
     http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
 

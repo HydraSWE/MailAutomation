@@ -8,6 +8,7 @@ from django.utils import timezone
 from .emails import (
     build_html_shell,
     deliver_account_created_email,
+    deliver_appsumo_activation_email,
     deliver_checkout_otp_email,
     deliver_email_change_otp,
     deliver_invoice_email,
@@ -44,6 +45,17 @@ EMAIL_TASK_OPTIONS = {
     "retry_jitter": True,
     "max_retries": 5,
 }
+
+
+@shared_task(**EMAIL_TASK_OPTIONS)
+def send_appsumo_activation_email(user_id: int, tier: int) -> str:
+    from .appsumo import summary
+    user = User.objects.select_related("organization").get(pk=user_id)
+    state = summary(user.organization)
+    if state["access_type"] != "lifetime" or not state["active"]:
+        return "inactive"
+    deliver_appsumo_activation_email(user, tier, state)
+    return "sent"
 
 
 def _record_delivery(invoice_id: int, sent_field: str, error_field: str, *, error: str = "") -> None:
@@ -192,9 +204,11 @@ def send_upcoming_renewal_reminders() -> dict[str, int]:
         .filter(
             status=Subscription.Status.ACTIVE,
             plan__is_free=False,
+            access_type="recurring",
             current_period_end__gt=now,
             current_period_end__lte=window_end,
         )
+        .exclude(plan__channel="appsumo")
     )
 
     sent_count = 0

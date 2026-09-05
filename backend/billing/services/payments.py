@@ -94,6 +94,15 @@ def fulfill_paid_invoice(invoice_id, transfer, *, manual_approval=False):
     invoice = PaymentInvoice.objects.select_for_update(of=("self",)).select_related("plan", "organization").get(pk=invoice_id)
     if invoice.status == PaymentInvoice.Status.PAID:
         return invoice
+    from ..appsumo import entitlement_for
+    if invoice.organization_id:
+        Organization.objects.select_for_update().get(pk=invoice.organization_id)
+    if invoice.plan.channel != "direct" or (invoice.organization_id and entitlement_for(invoice.organization)):
+        record_review_claim(invoice, transfer, "lifetime_entitlement_conflict")
+        invoice.status = PaymentInvoice.Status.MANUAL_REVIEW
+        invoice.verification_error = "Existing lifetime access requires owner payment review. No plan changes were applied."
+        invoice.save(update_fields=["status", "verification_error", "updated_at"])
+        return invoice
     allowed_statuses = {PaymentInvoice.Status.PENDING, PaymentInvoice.Status.VERIFYING}
     if manual_approval:
         allowed_statuses.add(PaymentInvoice.Status.MANUAL_REVIEW)

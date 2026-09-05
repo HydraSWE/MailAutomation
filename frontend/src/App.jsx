@@ -1,3 +1,4 @@
+import AppSumo, { AppSumoOwner } from "./pages/AppSumo";
 import { useEffect } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
@@ -58,6 +59,7 @@ function ProtectedRoute({ element, roles }) {
 }
 
 const router = createBrowserRouter([
+  { path: "/appsumo", element: <AppSumo />, errorElement: <RouteErrorBoundary /> },
   { path: "/", element: <Landing />, errorElement: <RouteErrorBoundary /> },
   { path: "/lead-hunter", element: <LeadHunterPublic />, errorElement: <RouteErrorBoundary /> },
   { path: "/login", element: <Login />, errorElement: <RouteErrorBoundary /> },
@@ -103,6 +105,7 @@ const router = createBrowserRouter([
           { path: "organizations", element: <PlatformOrganizations /> },
           { path: "users", element: <PlatformUsers /> },
           { path: "plans", element: <PlatformPlans /> },
+          { path: "appsumo", element: <AppSumoOwner /> },
           { path: "billing", element: <PlatformBilling /> },
           { path: "broadcasts", element: <PlatformBroadcasts /> },
           { path: "sessions", element: <PlatformSessions /> },

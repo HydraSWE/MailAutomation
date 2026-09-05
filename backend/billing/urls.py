@@ -80,3 +80,16 @@ urlpatterns = [
     path("invoices/<uuid:invoice_id>/replace/", InvoiceReplaceView.as_view(), name="invoice-replace"),
     path("invoices/<uuid:invoice_id>/cancel/", InvoiceCancelView.as_view(), name="invoice-cancel"),
 ]
+
+from .views.appsumo import OffersView, SignupStartView, SignupCompleteView, RedeemView, EntitlementView, OwnerAppSumoView
+urlpatterns += [
+    path("appsumo/offers/", OffersView.as_view()),
+    path("appsumo/signup/start/", SignupStartView.as_view()),
+    path("appsumo/signup/complete/", SignupCompleteView.as_view()),
+    path("appsumo/redeem/", RedeemView.as_view()),
+    path("appsumo/entitlement/", EntitlementView.as_view()),
+    path("platform/appsumo/", OwnerAppSumoView.as_view()),
+]
+
+from .views.appsumo import LeadHunterEntitlementView
+urlpatterns += [path("appsumo/lead-hunter/", LeadHunterEntitlementView.as_view())]

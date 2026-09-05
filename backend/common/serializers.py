@@ -30,7 +30,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     def validate_plan_slug(self, value):
         from billing.models import Plan
 
-        if not Plan.objects.filter(slug=value, is_active=True).exists():
+        if not Plan.objects.filter(slug=value, is_active=True, channel="direct").exists():
             raise serializers.ValidationError("Choose an active pricing plan.")
         return value
 
@@ -66,10 +66,16 @@ class OrganizationSerializer(serializers.ModelSerializer):
         return usage_snapshot(obj)
 
     def get_user_count(self, obj):
-        return obj.users.exclude(role__in=("owner", "admin")).count()
+        users = obj.users.exclude(role__in=("owner", "admin"))
+        if getattr(getattr(obj, "subscription", None), "access_type", "") == "lifetime":
+            users = users.filter(is_active=True)
+        return users.count()
 
     def get_admin_count(self, obj):
-        return obj.users.filter(role="admin").count()
+        users = obj.users.filter(role="admin")
+        if getattr(getattr(obj, "subscription", None), "access_type", "") == "lifetime":
+            users = users.filter(is_active=True)
+        return users.count()
 
     def get_mailbox_count(self, obj):
         return organization_mailbox_usage(obj)["inbox_count"]
@@ -85,7 +91,13 @@ class OrganizationSerializer(serializers.ModelSerializer):
             subscription = obj.subscription
         except ObjectDoesNotExist:
             return None
+        if subscription.access_type == "lifetime":
+            from billing.appsumo import entitlement_for, bounds
+            ent = entitlement_for(obj)
+            if ent:
+                subscription.current_period_start, subscription.current_period_end = bounds(ent)
         return {
+            "access_type": subscription.access_type,
             "plan": subscription.plan.slug,
             "plan_name": subscription.plan.name,
             "status": subscription.status,

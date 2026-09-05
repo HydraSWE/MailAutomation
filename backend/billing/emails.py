@@ -462,6 +462,24 @@ def deliver_account_created_email(user: Any) -> None:
     limits_source = custom_invoice.snapshot_limits if custom_invoice else plan
     limits = limits_text(limits_source) if limits_source else "Plan limits are not assigned yet."
 
+    is_lifetime = (
+        getattr(subscription, "access_type", "") == "lifetime"
+        or (plan and getattr(plan, "channel", "") == "appsumo")
+        or hasattr(organization, "appsumo_entitlement")
+    )
+
+    if is_lifetime:
+        period_text = (
+            f"Access type: Lifetime Access (No renewal payments required)\n"
+            f"Current usage cycle: {period_start} to {period_end}\n"
+            f"Next quota reset: Resets on {period_end}\n\n"
+        )
+    else:
+        period_text = (
+            f"Billing period: {period_start} to {period_end}\n"
+            f"Next billing period: starts after {period_end}\n\n"
+        )
+
     body = (
         f"Hello {user.name or user.username},\n\n"
         "Your Mail Flow account has been created.\n\n"
@@ -469,8 +487,7 @@ def deliver_account_created_email(user: Any) -> None:
         f"Organization: {organization.name}\n"
         f"Role: {user.get_role_display()}\n"
         f"Plan: {plan_name}\n"
-        f"Billing period: {period_start} to {period_end}\n"
-        f"Next billing period: starts after {period_end}\n\n"
+        f"{period_text}"
         f"{limits}\n\n"
         f"Sign in: {login_url}\n\n"
         "Use the password you set during signup. If an administrator created this account, ask them for your temporary password."
@@ -480,20 +497,97 @@ def deliver_account_created_email(user: Any) -> None:
         ("Organization", organization.name),
         ("Role", user.get_role_display()),
         ("Plan", plan_name),
-        ("Current Billing Period", f"{period_start} to {period_end}"),
-        ("Next Billing Period", f"Starts after {period_end}"),
     ]
+    if is_lifetime:
+        rows.extend([
+            ("Access Type", "Lifetime Access ($0 Renewal)"),
+            ("Current Usage Cycle", f"{period_start} to {period_end}"),
+            ("Next Quota Reset", f"Resets on {period_end}"),
+        ])
+    else:
+        rows.extend([
+            ("Current Billing Period", f"{period_start} to {period_end}"),
+            ("Next Billing Period", f"Starts after {period_end}"),
+        ])
+
+    badge = "AppSumo Lifetime" if is_lifetime else "Account Created"
+    footer_note = (
+        "Your lifetime access never expires. Monthly sending allowances reset automatically with zero renewal fees."
+        if is_lifetime
+        else "Use the password configured during onboarding or provided by your organization administrator."
+    )
+
     html = build_html_shell(
         "Your Mail Flow Account is Ready",
         f"Hello {user.name or user.username}, your Mail Flow account has been created with the details below.",
         rows,
         login_url,
         "Sign In to Mail Flow",
-        badge="Account Created",
-        footer_note="Use the password configured during onboarding or provided by your organization administrator.",
+        badge=badge,
+        footer_note=footer_note,
         template_name="emails/billing/account_created.html",
     )
     send_system_email("Your Mail Flow account is ready", body, user.email, html, sender="general")
+
+
+def deliver_appsumo_activation_email(user: Any, tier: int, state: dict[str, Any]) -> None:
+    organization = user.organization
+    current_tier = state.get("tier", tier)
+    period_start_str = format_datetime(state.get("period_start"))
+    period_end_str = format_datetime(state.get("period_end"))
+    limits = state.get("limits", {})
+    emails_limit = format_limit(limits.get("emails", 0))
+    contacts_limit = format_limit(limits.get("contacts", 0))
+    mailboxes_limit = format_limit(limits.get("mailboxes", 0))
+    seats_limit = format_limit(limits.get("seats", 0))
+
+    workspace_url = f"{settings.FRONTEND_URL.rstrip('/')}/mail-workspace"
+    billing_url = f"{settings.FRONTEND_URL.rstrip('/')}/billing"
+
+    subject = "Your Mail Flow AppSumo lifetime access is active"
+    body = (
+        f"Hello {user.name or user.username},\n\n"
+        f"Your AppSumo code activated Tier {tier}. Your workspace is now on Tier {current_tier} with lifetime access.\n\n"
+        f"Account Email: {user.email}\n"
+        f"Organization: {organization.name if organization else 'Your Workspace'}\n"
+        f"Access Type: Lifetime ($0 Renewal - No payment required)\n"
+        f"Current Usage Cycle: {period_start_str} to {period_end_str}\n"
+        f"Next Quota Reset: Resets on {period_end_str}\n\n"
+        f"Tier Allowances:\n"
+        f"• Monthly Email Sending Quota: {emails_limit} per month\n"
+        f"• Stored Contacts: {contacts_limit}\n"
+        f"• Connected Inboxes / SMTP: {mailboxes_limit}\n"
+        f"• Team Seats: {seats_limit}\n\n"
+        f"Open Mail Workspace to get started: {workspace_url}\n"
+        f"Review your allowances or stack additional codes in Account Billing: {billing_url}\n\n"
+        "No renewal payment is required."
+    )
+
+    rows = [
+        ("Account Email", user.email),
+        ("Organization", organization.name if organization else "Workspace"),
+        ("Activated Tier", f"AppSumo Tier {current_tier}"),
+        ("Access Type", "Lifetime ($0 Renewal)"),
+        ("Monthly Email Quota", f"{emails_limit} / month"),
+        ("Stored Contacts", contacts_limit),
+        ("Connected Inboxes", mailboxes_limit),
+        ("Team Seats", seats_limit),
+        ("Current Usage Cycle", f"{period_start_str} to {period_end_str}"),
+        ("Next Quota Reset", f"Resets on {period_end_str}"),
+    ]
+
+    html = build_html_shell(
+        "AppSumo Lifetime Access Active",
+        f"Hello {user.name or user.username}, your AppSumo code has activated Tier {tier}. "
+        f"Your workspace is now active on <strong>AppSumo Lifetime Tier {current_tier}</strong>.",
+        rows=rows,
+        cta_url=workspace_url,
+        cta_label="Open Mail Workspace",
+        badge=f"AppSumo Tier {current_tier} Active",
+        footer_note="Your lifetime access never expires. Monthly sending allowances refresh automatically every 30 days with no renewal payments required.",
+        template_name="emails/billing/account_created.html",
+    )
+    send_system_email(subject, body, user.email, html=html, sender="billing")
 
 
 def deliver_renewal_reminder_email(delivery: Any, admin_name: Optional[str] = None) -> None:

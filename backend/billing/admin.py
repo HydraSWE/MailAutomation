@@ -20,6 +20,9 @@ class PlanAdmin(admin.ModelAdmin):
         "weekly_email_limit", "max_admins", "max_users", "max_smtp_accounts",
         "max_recipients", "max_campaigns_per_day", "is_free", "is_active", "display_order",
     )
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(channel="direct")
+
     list_editable = ("is_active", "display_order")
     readonly_fields = ("price_bdt",)
     list_filter = ("is_free", "is_active")
@@ -29,6 +32,11 @@ class PlanAdmin(admin.ModelAdmin):
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.access_type == "lifetime":
+            return tuple(field.name for field in obj._meta.fields)
+        return super().get_readonly_fields(request, obj)
+
     list_display = ("organization", "plan", "status", "current_period_end")
     list_filter = ("status", "plan")
     search_fields = ("organization__name",)

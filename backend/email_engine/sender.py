@@ -34,7 +34,7 @@ def _connection(account):
     return server
 
 
-def _deliver_with_fallback(
+def _deliver_with_fallback_impl(
     account,
     msg,
     *,
@@ -242,3 +242,22 @@ def render_personalization(value, context):
         return match.group(0)
         
     return pattern.sub(_replacer, str(value))
+
+
+def _deliver_with_fallback(account, msg, **kwargs):
+    from billing.appsumo import entitlement_for, metered_delivery
+    org = account.organization if account.organization_id else None
+    if not org or not entitlement_for(org):
+        return _deliver_with_fallback_impl(account, msg, **kwargs)
+    def send():
+        # A failure during SMTP DATA can be ambiguous: do not invoke a second transport.
+        server = _connection(account)
+        try:
+            server.send_message(msg)
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                server.close()
+        return kwargs["message_id"]
+    return metered_delivery(org, kwargs["request_id"], send)

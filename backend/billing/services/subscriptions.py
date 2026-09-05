@@ -3,6 +3,8 @@ from .notifications import queue_account_created_email
 from .turnstile import verify_turnstile
 
 def apply_plan_to_organization(organization, plan, *, activate=True):
+    from ..appsumo import require_direct
+    require_direct(organization, plan)
     plan_key = (plan.slug or "").strip().lower()
     plan_name = (plan.name or "").strip().lower()
     support_workspace_plan = (
@@ -33,6 +35,8 @@ def apply_plan_to_organization(organization, plan, *, activate=True):
 
 
 def apply_custom_limits_to_organization(organization, snapshot_limits, *, activate=True):
+    from ..appsumo import require_direct
+    require_direct(organization)
     organization.max_admins = int(snapshot_limits["max_admins"])
     organization.max_users = int(snapshot_limits["max_users"])
     organization.max_smtp_accounts = int(snapshot_limits["max_smtp_accounts"])

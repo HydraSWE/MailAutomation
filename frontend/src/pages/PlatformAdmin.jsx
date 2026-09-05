@@ -8,6 +8,7 @@ const tabs = [
   ["/platform/organizations", "Organizations", Building2],
   ["/platform/users", "Users", Users],
   ["/platform/plans", "Plans", Tags],
+  ["/platform/appsumo", "AppSumo", Tags],
   ["/platform/billing", "Billing & Payments", CreditCard],
   ["/platform/broadcasts", "Broadcasts", Megaphone],
   ["/platform/sessions", "Sessions & Security", ShieldCheck],

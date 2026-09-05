@@ -13,6 +13,9 @@ def organization_plan(organization):
 
 
 def organization_has_support_workspace_plan(organization):
+    from billing.appsumo import entitlement_for, resolve
+    if entitlement_for(organization):
+        return resolve(organization)["active"]
     plan = organization_plan(organization)
     if not plan:
         return False

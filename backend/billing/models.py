@@ -8,6 +8,7 @@ from django.db.models import Q
 
 
 class Plan(models.Model):
+    channel = models.CharField(max_length=16, default="direct", choices=[("direct", "Direct"), ("appsumo", "AppSumo")])
     slug = models.SlugField(unique=True)
     name = models.CharField(max_length=40)
     original_price_bdt = models.PositiveIntegerField(default=0)
@@ -58,6 +59,7 @@ class Plan(models.Model):
 
 
 class Subscription(models.Model):
+    access_type = models.CharField(max_length=16, default="recurring", choices=[("recurring", "Recurring"), ("lifetime", "Lifetime")])
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         EXPIRED = "expired", "Expired"
@@ -401,3 +403,4 @@ class BillingReminderDelivery(models.Model):
         return f"Renewal reminder for {self.recipient_email} - {self.subscription_id} ({self.renewal_date})"
 
 
+from .appsumo_models import (AppSumoOffer, AppSumoTier, AppSumoEntitlement, AppSumoBatch, AppSumoCode, AppSumoAudit, AppSumoUsage, AppSumoSendReservation, AppSumoImportReceipt, AppSumoSignupChallenge, AppSumoRefundPreview)

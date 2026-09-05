@@ -220,6 +220,9 @@ def complete_custom_activation(
 
     # 3. Create or Link Admin User
     if existing_user:
+        from ..appsumo import require_direct
+        if existing_user.organization_id:
+            require_direct(existing_user.organization)
         if username and username.lower() != existing_user.username.lower():
             if User.objects.filter(username__iexact=username).exclude(pk=existing_user.pk).exists():
                 raise ValidationError({"username": "This username is already taken. Please choose another."})

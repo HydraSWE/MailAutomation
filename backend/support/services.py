@@ -192,7 +192,10 @@ def mailbox_relay_payload(mailbox, recipient, subject, body, *, message_id="", i
 
 
 def send_via_mailbox(mailbox, recipient, subject, body, *, message_id="", in_reply_to="", references=""):
-    return _send_via_mailbox_relay(mailbox, recipient, subject, body, message_id=message_id, in_reply_to=in_reply_to, references=references)
+    from billing.appsumo import metered_delivery
+    org = mailbox.organization if mailbox.organization_id else None
+    key = "mailbox:" + (message_id or uuid.uuid4().hex)
+    return metered_delivery(org, key, lambda: _send_via_mailbox_relay(mailbox, recipient, subject, body, message_id=message_id, in_reply_to=in_reply_to, references=references))
 
 
 def _send_via_mailbox_relay(mailbox, recipient, subject, body, *, message_id="", in_reply_to="", references=""):
@@ -238,6 +241,9 @@ def _send_via_mailbox_relay(mailbox, recipient, subject, body, *, message_id="",
 
 
 def sync_mailbox(mailbox, *, limit=20):
+    from billing.appsumo import require_productive
+    if mailbox.organization_id:
+        require_productive(mailbox.organization)
     if not mailbox.is_active:
         return {"imported": 0, "detail": "Mailbox is inactive."}
     imported = 0

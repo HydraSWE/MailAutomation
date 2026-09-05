@@ -23,7 +23,7 @@ class OrganizationAdminForm(forms.ModelForm):
             except ObjectDoesNotExist:
                 pass
         plan_field = cast(forms.ModelChoiceField, self.fields["plan"])
-        plan_field.queryset = Plan.objects.filter(is_active=True) | Plan.objects.filter(pk=current_plan_id)
+        plan_field.queryset = Plan.objects.filter(is_active=True, channel="direct") | Plan.objects.filter(pk=current_plan_id)
         plan_field.initial = current_plan_id
 
 

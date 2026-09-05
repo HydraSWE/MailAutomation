@@ -39,5 +39,7 @@ class RecipientSerializer(serializers.ModelSerializer):
         organization = Organization.objects.select_for_update().get(pk=validated_data["organization"].pk)
         if Recipient.objects.filter(organization=organization).count() >= organization.max_recipients:
             raise serializers.ValidationError({"detail": "Recipient limit reached for this account."})
+        from billing.appsumo import require_productive
+        require_productive(organization)
         validated_data["organization"] = organization
         return super().create(validated_data)

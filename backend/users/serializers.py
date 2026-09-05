@@ -18,6 +18,10 @@ def _seat_count(organization, role, exclude_user=None):
     users = organization.users.all()
     if exclude_user:
         users = users.exclude(pk=exclude_user.pk)
+    from billing.appsumo import entitlement_for, tier_for
+    ent = entitlement_for(organization)
+    if ent:
+        return users.filter(is_active=True).count(), tier_for(ent).limits["seats"], "Active team seat"
     if role == User.Role.ADMIN:
         return users.filter(role=User.Role.ADMIN).count(), organization.max_admins, "Administrator"
     return users.exclude(role__in=(User.Role.OWNER, User.Role.ADMIN)).count(), organization.max_users, "User"
@@ -292,7 +296,17 @@ class UserSerializer(serializers.ModelSerializer):
         transaction.on_commit(lambda: queue_account_created_email(user.pk))
         return user
 
+    @transaction.atomic
     def update(self, instance, validated_data):
+        from billing.appsumo import entitlement_for
+        if instance.organization_id and entitlement_for(instance.organization):
+            org = Organization.objects.select_for_update().get(pk=instance.organization_id)
+            if validated_data.get("is_active", instance.is_active):
+                count, limit, label = _seat_count(org, validated_data.get("role", instance.role), instance)
+                if count >= limit:
+                    raise serializers.ValidationError({"detail": "Active team seat limit reached."})
+            elif instance.role == "admin" and self._is_last_active_admin(instance):
+                raise serializers.ValidationError({"detail": "Cannot deactivate the last administrator."})
         password = validated_data.pop("password", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

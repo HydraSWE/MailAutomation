@@ -442,7 +442,7 @@ export default function ProfileSettingsTab({
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleConfirmEmailChange} className="space-y-4">
+              <form onSubmit={onConfirmEmailChange} className="space-y-4">
                 <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl flex items-start gap-2.5">
                   <AlertCircle className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                   <div className="text-xs text-sky-200">

@@ -44,6 +44,9 @@ def authenticate_lead_hunter_request(request):
         if getattr(u, "is_superuser", False) or getattr(u, "is_staff", False):
             return True
 
+        from billing.appsumo import entitlement_for, resolve
+        if org and entitlement_for(org):
+            return resolve(org)["active"]
         # Strictly limit access to Organization Owner and Admin roles only
         user_role = getattr(u, "role", "")
         if user_role not in ("owner", "admin"):
@@ -122,6 +125,10 @@ class RecipientListViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
             }
             for rl in lists
         ]
+
+        from billing.appsumo import entitlement_for, lead_hunter_quota
+        if entitlement_for(organization):
+            return Response({"ok": True, "results": results, "quota": lead_hunter_quota(organization, user)})
 
         # Quota metadata for Lead Hunter
         sub = getattr(organization, "subscription", None)
@@ -218,6 +225,10 @@ class RecipientViewSet(TenantViewSetMixin, viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[])
     def push_leads(self, request):
+        from billing.appsumo import entitlement_for, import_leads
+        actor, org = authenticate_lead_hunter_request(request)
+        if org and entitlement_for(org):
+            return Response(import_leads(org, actor, request.data))
         user, organization = authenticate_lead_hunter_request(request)
         if not user or not organization:
             return Response({"detail": "Authentication credentials were not provided or invalid."}, status=401)

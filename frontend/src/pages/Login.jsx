@@ -373,7 +373,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Username or Account ID
+                Username or Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -383,7 +383,7 @@ export default function Login() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. admin or username"
+                  placeholder="e.g. admin or you@example.com"
                   autoComplete="username"
                   required
                   style={{ paddingLeft: "42px" }}

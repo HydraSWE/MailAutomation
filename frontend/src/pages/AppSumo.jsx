@@ -44,6 +44,12 @@ const date = (value) =>
 
 function errorText(error) {
   const data = error.response?.data;
+  if (typeof data === "string") {
+    if (data.toLowerCase().includes("<!doctype") || data.toLowerCase().includes("<html")) {
+      return "Server error. Check the backend logs and confirm the AppSumo migrations are applied.";
+    }
+    return data || "The request could not be completed.";
+  }
   return String(
     data?.detail ||
     Object.values(data || {})

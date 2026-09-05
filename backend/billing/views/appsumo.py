@@ -5,7 +5,7 @@ import secrets
 from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
-from django.db import transaction, IntegrityError
+from django.db import transaction, IntegrityError, OperationalError, ProgrammingError
 from django.db.models import Count
 from django.http import HttpResponse
 from django.utils import timezone
@@ -165,14 +165,17 @@ class OwnerAppSumoView(AppSumoView):
 
     def get(self, request):
         offset = serializers.IntegerField(min_value=0, max_value=10000000).run_validation(request.query_params.get("offset", 0))
-        batches = AppSumoBatch.objects.annotate(code_count=Count("codes")).order_by("-created_at")
-        return Response({"batches": list(batches.values("id", "offer_id", "environment", "active", "created_at", "created_by_id", "code_count")[:100]),
-            "code_count": AppSumoCode.objects.count(), "offset": offset,
-            "flags": {"smoke": settings.APPSUMO_OWNER_SMOKE_ENABLED, "code_admin": settings.APPSUMO_CODE_ADMIN_ENABLED},
-            "codes": list(AppSumoCode.objects.order_by("id").values("id", "masked_code", "batch_id", "organization_id", "redeemed_at", "revoked")[offset:offset+200]),
-            "audit": list(AppSumoAudit.objects.order_by("-created_at").values()[:100]),
-            "unresolved_sends": list(AppSumoSendReservation.objects.filter(state__in=["reserved", "ambiguous"]).values("id", "usage__organization_id", "state", "created_at")[:100]),
-            "unused_codes": AppSumoCode.objects.filter(organization__isnull=True, revoked=False, batch__environment="production", batch__active=True).count()})
+        try:
+            batches = AppSumoBatch.objects.annotate(code_count=Count("codes")).order_by("-created_at")
+            return Response({"batches": list(batches.values("id", "offer_id", "environment", "active", "created_at", "code_count")[:100]),
+                "code_count": AppSumoCode.objects.count(), "offset": offset,
+                "flags": {"smoke": settings.APPSUMO_OWNER_SMOKE_ENABLED, "code_admin": settings.APPSUMO_CODE_ADMIN_ENABLED},
+                "codes": list(AppSumoCode.objects.order_by("id").values("id", "masked_code", "batch_id", "organization_id", "redeemed_at", "revoked")[offset:offset+200]),
+                "audit": list(AppSumoAudit.objects.order_by("-created_at").values()[:100]),
+                "unresolved_sends": list(AppSumoSendReservation.objects.filter(state__in=["reserved", "ambiguous"]).values("id", "usage__organization_id", "state", "created_at")[:100]),
+                "unused_codes": AppSumoCode.objects.filter(organization__isnull=True, revoked=False, batch__environment="production", batch__active=True).count()})
+        except (OperationalError, ProgrammingError):
+            return Response({"code": "appsumo_migrations_pending", "detail": "AppSumo tables are not ready. Apply billing migrations before using the owner console."}, status=503)
 
     def post(self, request):
         action = request.data.get("action")

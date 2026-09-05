@@ -260,6 +260,16 @@ class AppSumoTests(TestCase):
             self.assertEqual(result.status_code, 200)
         self.assertEqual(s.summary(self.org)["tier"], 0)
 
+    def test_owner_console_lists_batches_with_counts(self):
+        owner = User.objects.create_user(username="owner-console", role="owner")
+        batch = AppSumoBatch.objects.create(offer=self.offer, environment="test", active=True)
+        AppSumoCode.objects.create(batch=batch, digest=s.digest("A"*40), encrypted_code="test-only", masked_code="****AAAAAA")
+        client = APIClient()
+        client.force_authenticate(owner)
+        response = client.get("/api/billing/platform/appsumo/?offset=0")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn("code_count", response.data["batches"][0])
+
     @override_settings(APPSUMO_CODE_ADMIN_ENABLED=True)
     def test_batch_export_is_headerless_encrypted_and_audited(self):
         from .models import AppSumoAudit
